@@ -1,5 +1,5 @@
-# Research Data Layer (Strictly untracked)
-/research_data/
+# FlyWire research datasets and generated artifacts
+research_data/
 
 # Specific Heavy Artifacts
 *.graphml
