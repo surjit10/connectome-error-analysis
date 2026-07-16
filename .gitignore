@@ -18,6 +18,9 @@ __pycache__/
 .ipynb_checkpoints/
 .pytest_cache/
 
+# Virtual environment
+.venv/
+
 # Local reference and documentation (untracked per user request)
 
 /0-reference/
