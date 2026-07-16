@@ -17,3 +17,7 @@
 __pycache__/
 .ipynb_checkpoints/
 .pytest_cache/
+
+# Local reference and documentation (untracked per user request)
+/docs/
+/0-reference/
