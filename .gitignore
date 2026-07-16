@@ -1,0 +1,19 @@
+# Research Data Layer (Strictly untracked)
+/research_data/
+
+# Specific Heavy Artifacts
+*.graphml
+*.parquet
+*.h5
+*.npy
+
+# Kaggle / Execution Artifacts
+*.zip
+*.tar.gz
+*.checkpoint
+*.log
+
+# Caches
+__pycache__/
+.ipynb_checkpoints/
+.pytest_cache/
