@@ -1,0 +1,55 @@
+"""
+Phase 008 – Error Model Framework
+===================================
+Public surface of the error-models package.
+
+Downstream components (Experiment Runner, research modules) should import
+from here, not from the sub-modules directly.
+
+Typical Experiment Runner usage::
+
+    from modules.error_models import registry, ErrorResult, ErrorModelStatus
+
+    model  = registry.instantiate("missed_synapses")
+    result = model.execute(prepared_graph, config={"removal_rate": 0.05})
+
+    if result.status == ErrorModelStatus.SUCCESS:
+        analysis.execute(result.perturbed_graph)
+
+Typical concrete model authoring::
+
+    from modules.error_models import BaseErrorModel, registry
+
+    class MissedSynapses(BaseErrorModel):
+        NAME = "missed_synapses"
+
+        def _perturb(self, graph_copy, config, result):
+            ...  # biological perturbation logic (Phase 011+)
+
+    registry.register(MissedSynapses)
+"""
+
+from .exceptions import (
+    ErrorModelFrameworkError,
+    ErrorModelExecutionError,
+    InvalidInputError,
+    ErrorRegistryError,
+)
+from .error_result import ErrorResult, ErrorModelStatus
+from .base_error_model import BaseErrorModel
+from .error_registry import ErrorRegistry, registry
+
+__all__ = [
+    # Core contract
+    "BaseErrorModel",
+    "ErrorResult",
+    "ErrorModelStatus",
+    # Registry
+    "ErrorRegistry",
+    "registry",
+    # Exceptions
+    "ErrorModelFrameworkError",
+    "ErrorModelExecutionError",
+    "InvalidInputError",
+    "ErrorRegistryError",
+]
