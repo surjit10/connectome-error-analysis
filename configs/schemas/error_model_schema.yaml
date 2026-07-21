@@ -1,0 +1,9 @@
+# configs/schemas/error_model_schema.yaml
+# Defines the required keys for a valid error model configuration YAML.
+
+required_keys:
+  - name
+
+optional_keys:
+  - config
+  - description

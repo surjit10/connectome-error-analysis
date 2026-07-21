@@ -5,17 +5,18 @@ Orchestrates the complete FlyWire experiment pipeline by coordinating all
 previously implemented framework components.
 
 The runner is a **pure orchestrator**: it calls public APIs from Phases
-004–008 but never implements graph algorithms, perturbation logic, or
+004–010 but never implements graph algorithms, perturbation logic, or
 statistics.
 
-Architecture changes vs original:
+Architecture (Version 3 igraph):
     - No ``graph.copy()`` anywhere.  The baseline igraph.Graph is immutable.
     - Error models return an ``ErrorResult`` containing ``edge_mask`` and
       ``weight_updates`` instead of a perturbed graph copy.
     - The runner builds a **temporary** igraph subgraph from the baseline +
       edge_mask for the duration of analysis, then deletes it immediately.
-    - Results are exported and released after every experiment (Priority 8).
-    - A ``RuntimeMonitor`` records RAM + wall time (Priority 9).
+    - After all analysis, Statistics are computed and the Export Manager
+      packages results.
+    - A ``RuntimeMonitor`` records RAM + wall time.
 
 Execution pipeline::
 
@@ -33,16 +34,18 @@ Execution pipeline::
             ▼
     PreparedGraph  (immutable baseline — never modified)
             │
-            ├──── Error Model ────┐   (modules.error_models.registry)
-            │                    │
-            │             ErrorResult (edge_mask + weight_updates)
-            │                    │
-            │      Build temp igraph subgraph from mask
-            │                    │
+            ├──── Baseline Analyses (optional) ──────────────────────┐
+            │                                                         │
+            ├──── Error Model ────┐   (modules.error_models.registry) │
+            │                    │                                    │
+            │             ErrorResult (edge_mask + weight_updates)    │
+            │                    │                                    │
+            │      Build temp igraph subgraph from mask               │
+            │                    │                                    │
             └──── Analyses ←─────┘   (modules.graph_analyses.registry)
                     │
                     ▼
-            ExperimentResult → Export → Delete temp graph → Next experiment
+            ExperimentResult → Statistics → Export → Delete temp graph
 """
 
 from __future__ import annotations
@@ -86,6 +89,9 @@ class ExperimentConfig:
             ``"MANC"``).
         dataset_root:
             Path to the directory that contains the dataset folders.
+        configs_root:
+            Path to the ``configs/`` directory (used for DatasetRegistry
+            and ConfigManager).  Defaults to ``"configs/"``.
         error_model_name:
             Name of the error model to apply (must be registered in the
             :class:`~modules.error_models.error_registry.ErrorRegistry`).
@@ -94,7 +100,10 @@ class ExperimentConfig:
             Configuration dict forwarded to the error model's ``execute()``
             call.  May be empty.
         analysis_names:
-            Ordered list of analysis names to run.
+            Ordered list of analysis names to run after error model application.
+        baseline_analysis_names:
+            Optional ordered list of analysis names to run on the unperturbed
+            baseline before the error model is applied.  Empty by default.
         analysis_configs:
             Optional per-analysis config dicts keyed by analysis name.
         preprocessing_config:
@@ -103,19 +112,28 @@ class ExperimentConfig:
             Optional integer random seed forwarded to the error model.
         experiment_id:
             Optional human-readable identifier.  Auto-generated if omitted.
+        output_root:
+            Root directory for result export packages.  Pass ``None`` to
+            disable automatic export.
+        create_zip:
+            Whether to create a ZIP archive of the export package.
         extra:
             Free-form metadata stored in the result but not used by the runner.
     """
 
     dataset_name: str
     dataset_root: str
+    configs_root: str = "configs/"
     error_model_name: Optional[str] = None
     error_model_config: Dict[str, Any] = field(default_factory=dict)
     analysis_names: List[str] = field(default_factory=list)
+    baseline_analysis_names: List[str] = field(default_factory=list)
     analysis_configs: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     preprocessing_config: Dict[str, Any] = field(default_factory=dict)
     seed: Optional[int] = None
     experiment_id: str = ""
+    output_root: Optional[str] = None
+    create_zip: bool = True
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -153,6 +171,7 @@ class ExperimentResult:
         prepared_graph:        The baseline :class:`~modules.preprocessing.PreparedGraph`.
         error_result:          :class:`~modules.error_models.ErrorResult` or
                                ``None`` for baseline runs.
+        baseline_analysis_results: Analysis results on unperturbed baseline.
         analysis_results:      Ordered list of :class:`~modules.graph_analyses.AnalysisResult`.
         runtime_seconds:       Total wall-clock time for the complete pipeline.
         peak_ram_mb:           Peak RAM usage during the run (MB), if monitored.
@@ -169,6 +188,7 @@ class ExperimentResult:
     config_snapshot: Dict[str, Any] = field(default_factory=dict)
     prepared_graph: Optional[PreparedGraph] = None
     error_result: Optional[ErrorResult] = None
+    baseline_analysis_results: List[AnalysisResult] = field(default_factory=list)
     analysis_results: List[AnalysisResult] = field(default_factory=list)
     runtime_seconds: float = 0.0
     peak_ram_mb: float = 0.0
@@ -200,19 +220,20 @@ class ExperimentResult:
     def to_dict(self) -> Dict[str, Any]:
         """Return a serialisable summary (omits graph objects)."""
         return {
-            "experiment_id":    self.experiment_id,
-            "status":           self.status.value,
-            "dataset_name":     self.dataset_name,
-            "runtime_seconds":  self.runtime_seconds,
-            "peak_ram_mb":      self.peak_ram_mb,
-            "started_at":       self.started_at,
-            "finished_at":      self.finished_at,
-            "error_model":      self.error_result.model_name if self.error_result else None,
-            "error_model_status": self.error_result.status.value if self.error_result else None,
-            "analyses":         [r.to_dict() for r in self.analysis_results],
-            "warnings":         self.warnings,
-            "errors":           self.errors,
-            "extra":            self.extra,
+            "experiment_id":              self.experiment_id,
+            "status":                     self.status.value,
+            "dataset_name":               self.dataset_name,
+            "runtime_seconds":            self.runtime_seconds,
+            "peak_ram_mb":                self.peak_ram_mb,
+            "started_at":                 self.started_at,
+            "finished_at":                self.finished_at,
+            "error_model":                self.error_result.model_name if self.error_result else None,
+            "error_model_status":         self.error_result.status.value if self.error_result else None,
+            "baseline_analyses":          [r.to_dict() for r in self.baseline_analysis_results],
+            "analyses":                   [r.to_dict() for r in self.analysis_results],
+            "warnings":                   self.warnings,
+            "errors":                     self.errors,
+            "extra":                      self.extra,
         }
 
     def summary(self) -> str:
@@ -318,6 +339,10 @@ class ExperimentRunner:
             result.summary(),
         )
 
+        # ── Auto-export (optional) ───────────────────────────────────────
+        if config.output_root:
+            self._step_export(config, result)
+
         return result
 
     # ------------------------------------------------------------------ #
@@ -329,13 +354,13 @@ class ExperimentRunner:
     ) -> None:
         """Execute each pipeline step in order, aborting on fatal errors."""
 
-        # ── Step 1: Load dataset ────────────────────────────────────────
+        # ── Step 1: Load dataset ─────────────────────────────────────────
         dataset = self._step_load_dataset(config, result)
         if dataset is None:
             result.status = ExperimentStatus.FAILED
             return
 
-        # ── Step 2: Build graph ─────────────────────────────────────────
+        # ── Step 2: Build graph ──────────────────────────────────────────
         graph = self._step_build_graph(dataset, result)
         if graph is None:
             result.status = ExperimentStatus.FAILED
@@ -344,14 +369,18 @@ class ExperimentRunner:
         # Release the raw dataframes — graph holds all required data.
         del dataset
 
-        # ── Step 3: Preprocess graph ────────────────────────────────────
+        # ── Step 3: Preprocess graph ─────────────────────────────────────
         prepared = self._step_preprocess(graph, config, result)
         if prepared is None:
             result.status = ExperimentStatus.FAILED
             return
         result.prepared_graph = prepared
 
-        # ── Step 4: Apply error model (optional) ────────────────────────
+        # ── Step 4: Run baseline analyses (optional) ─────────────────────
+        if config.baseline_analysis_names:
+            self._step_run_baseline_analyses(prepared, config, result)
+
+        # ── Step 5: Apply error model (optional) ─────────────────────────
         error_result: Optional[ErrorResult] = None
 
         if config.error_model_name:
@@ -367,7 +396,7 @@ class ExperimentRunner:
                 result.warnings.append(msg)
                 error_result = None  # fall back to baseline
 
-        # ── Step 5: Build temporary analysis graph ──────────────────────
+        # ── Step 6: Build temporary analysis graph ───────────────────────
         # If an error model produced a mask, build a temporary subgraph.
         # Otherwise analyses run directly on the immutable baseline graph.
         temp_graph: Optional[igraph.Graph] = None
@@ -380,11 +409,11 @@ class ExperimentRunner:
             if temp_prepared is not None:
                 analysis_target = temp_prepared
 
-        # ── Step 6: Run analyses ────────────────────────────────────────
+        # ── Step 7: Run analyses ─────────────────────────────────────────
         if config.analysis_names:
             self._step_run_analyses(analysis_target, config, result)
 
-        # ── Step 7: Destroy temporary graph immediately ──────────────────
+        # ── Step 8: Destroy temporary graph immediately ──────────────────
         if temp_graph is not None:
             del temp_graph
             del analysis_target
@@ -407,7 +436,11 @@ class ExperimentRunner:
             config.dataset_name, config.dataset_root,
         )
         try:
-            dataset = load_dataset(config.dataset_name, config.dataset_root)
+            dataset = load_dataset(
+                config.dataset_name,
+                config.dataset_root,
+                configs_root=config.configs_root,
+            )
             logger.info(
                 "[ExperimentRunner] Dataset loaded: %d neurons, %d connections.",
                 len(dataset.neurons), len(dataset.connections),
@@ -455,6 +488,7 @@ class ExperimentRunner:
                 expected_edge_attrs=pp_cfg.get("expected_edge_attrs"),
                 index_node_attrs=pp_cfg.get("index_node_attrs"),
                 raise_on_error=pp_cfg.get("raise_on_error", False),
+                feature_config=pp_cfg.get("features"),
             )
             if not prepared.is_valid:
                 msg = (
@@ -464,11 +498,28 @@ class ExperimentRunner:
                 logger.warning("[ExperimentRunner] %s", msg)
                 result.warnings.append(msg)
             return prepared
-        except PreprocessingError as exc:
+        except (PreprocessingError, TypeError) as exc:
             msg = f"Preprocessing failed: {exc}"
             logger.error("[ExperimentRunner] %s", msg)
             result.errors.append(msg)
             return None
+
+    def _step_run_baseline_analyses(
+        self,
+        prepared: PreparedGraph,
+        config: ExperimentConfig,
+        result: ExperimentResult,
+    ) -> None:
+        """Run analyses on the unperturbed baseline graph."""
+        logger.info(
+            "[ExperimentRunner] Running %d baseline analysis/analyses.",
+            len(config.baseline_analysis_names),
+        )
+        for name in config.baseline_analysis_names:
+            a_result = self._run_single_analysis(
+                name, prepared, config, result, is_baseline=True
+            )
+            result.baseline_analysis_results.append(a_result)
 
     def _step_apply_error_model(
         self,
@@ -484,7 +535,7 @@ class ExperimentRunner:
         name = config.error_model_name
         logger.info("[ExperimentRunner] Applying error model '%s'.", name)
 
-        # ── Instantiate ─────────────────────────────────────────────────
+        # ── Instantiate ──────────────────────────────────────────────────
         try:
             model = self._error_registry.instantiate(name)
         except Exception as exc:  # noqa: BLE001
@@ -493,7 +544,7 @@ class ExperimentRunner:
             result.errors.append(msg)
             return None
 
-        # ── Execute ─────────────────────────────────────────────────────
+        # ── Execute ──────────────────────────────────────────────────────
         error_result: ErrorResult = model.execute(
             prepared,
             config=config.error_model_config,
@@ -532,14 +583,12 @@ class ExperimentRunner:
 
             # Build the subgraph using igraph's subgraph_edges.
             # This creates a new igraph.Graph that does NOT share references
-            # with the baseline — it is safe to discard after analysis.
+            # with the baseline — safe to discard after analysis.
             temp_graph: igraph.Graph = baseline.subgraph_edges(
                 active_edge_indices, delete_vertices=False
             )
 
             # Apply weight updates to the temporary graph.
-            # Map from baseline edge index to temp graph edge index via
-            # the active_edge_indices positional mapping.
             if weight_updates:
                 baseline_to_temp: Dict[int, int] = {
                     baseline_idx: temp_idx
@@ -559,11 +608,10 @@ class ExperimentRunner:
             # Copy graph-level metadata from baseline so preprocessing works.
             for attr in baseline.attributes():
                 temp_graph[attr] = baseline[attr]
-            # Update edge/node counts to reflect the subgraph.
             temp_graph["edge_count"] = temp_graph.ecount()
             temp_graph["node_count"] = temp_graph.vcount()
 
-            # Wrap in a PreparedGraph (lightweight — no deep preprocessing).
+            # Wrap in a PreparedGraph (lightweight — reuse baseline features).
             temp_prepared = preprocess_graph(
                 temp_graph,
                 expected_node_attrs=config.preprocessing_config.get(
@@ -575,7 +623,21 @@ class ExperimentRunner:
                 index_node_attrs=config.preprocessing_config.get(
                     "index_node_attrs"
                 ),
+                # Reuse baseline features — do not recompute on the
+                # temporary graph (they describe the baseline population).
+                feature_config={
+                    "indegree": False,
+                    "outdegree": False,
+                    "total_degree": False,
+                    "pagerank": False,
+                    "reciprocal_ratio": False,
+                    "hub_neighbor_count": False,
+                    "two_hop_size": False,
+                },
             )
+            # Attach the baseline features to the temp PreparedGraph so
+            # analyses can still access them.
+            temp_prepared.baseline_features = prepared.baseline_features
 
             return temp_graph, temp_prepared
 
@@ -596,34 +658,76 @@ class ExperimentRunner:
     ) -> None:
         """Instantiate and execute each configured analysis in order."""
         for name in config.analysis_names:
-            logger.info("[ExperimentRunner] Running analysis '%s'.", name)
-
-            # ── Instantiate ──────────────────────────────────────────────
-            try:
-                analysis = self._analysis_registry.instantiate(name)
-            except Exception as exc:  # noqa: BLE001
-                msg = f"Could not instantiate analysis '{name}': {exc}"
-                logger.error("[ExperimentRunner] %s", msg)
-                result.errors.append(msg)
-                placeholder = AnalysisResult(
-                    analysis_name=name,
-                    status=AnalysisStatus.FAILED,
-                    dataset_name=config.dataset_name,
-                    errors=[msg],
-                )
-                result.analysis_results.append(placeholder)
-                continue
-
-            # ── Execute ──────────────────────────────────────────────────
-            a_config = config.analysis_configs.get(name, {})
-            a_result: AnalysisResult = analysis.execute(target, config=a_config)
+            a_result = self._run_single_analysis(
+                name, target, config, result, is_baseline=False
+            )
             result.analysis_results.append(a_result)
 
-            if a_result.status == AnalysisStatus.FAILED:
-                logger.warning(
-                    "[ExperimentRunner] Analysis '%s' failed: %s",
-                    name, a_result.errors,
-                )
+    def _run_single_analysis(
+        self,
+        name: str,
+        target: PreparedGraph,
+        config: ExperimentConfig,
+        result: ExperimentResult,
+        *,
+        is_baseline: bool,
+    ) -> AnalysisResult:
+        """Instantiate and run one analysis; return its result."""
+        tag = "baseline " if is_baseline else ""
+        logger.info("[ExperimentRunner] Running %sanalysis '%s'.", tag, name)
+
+        # ── Instantiate ──────────────────────────────────────────────────
+        try:
+            analysis = self._analysis_registry.instantiate(name)
+        except Exception as exc:  # noqa: BLE001
+            msg = f"Could not instantiate analysis '{name}': {exc}"
+            logger.error("[ExperimentRunner] %s", msg)
+            result.errors.append(msg)
+            return AnalysisResult(
+                analysis_name=name,
+                status=AnalysisStatus.FAILED,
+                dataset_name=config.dataset_name,
+                errors=[msg],
+            )
+
+        # ── Execute ──────────────────────────────────────────────────────
+        a_config = config.analysis_configs.get(name, {})
+        a_result: AnalysisResult = analysis.execute(target, config=a_config)
+
+        if a_result.status == AnalysisStatus.FAILED:
+            logger.warning(
+                "[ExperimentRunner] Analysis '%s' failed: %s",
+                name, a_result.errors,
+            )
+        return a_result
+
+    def _step_export(
+        self,
+        config: ExperimentConfig,
+        result: ExperimentResult,
+    ) -> None:
+        """Run Statistics + Export Manager and write result package to disk."""
+        try:
+            from core.statistics_engine import StatisticsEngine
+            from core.metadata_manager import MetadataManager
+            from core.export_manager import ExportManager
+
+            stats    = StatisticsEngine().aggregate([result])
+            metadata = MetadataManager().collect(result)
+            package  = ExportManager().export(
+                result=result,
+                metadata=metadata,
+                stats=stats,
+                output_root=Path(config.output_root),
+                create_zip=config.create_zip,
+            )
+            logger.info(
+                "[ExperimentRunner] Export complete: %s", package.summary()
+            )
+        except Exception as exc:  # noqa: BLE001
+            msg = f"Export failed: {exc}"
+            logger.warning("[ExperimentRunner] %s", msg)
+            result.warnings.append(msg)
 
     # ------------------------------------------------------------------ #
     # Repr                                                                 #

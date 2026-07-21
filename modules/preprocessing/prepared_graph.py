@@ -55,6 +55,24 @@ class PreparedGraph:
         lookup:
             :class:`~modules.preprocessing.lookup.GraphLookup` providing O(1)
             lookup structures.
+        baseline_features:
+            Dict of pre-computed baseline structural features keyed by feature
+            name.  Features are computed exactly once during preprocessing so
+            that error models and analyses never need to recompute them.
+
+            Standard keys (when available):
+
+            * ``"indegree"``            — list[int], per-vertex in-degree.
+            * ``"outdegree"``           — list[int], per-vertex out-degree.
+            * ``"total_degree"``        — list[int], in+out degree.
+            * ``"pagerank"``            — list[float], PageRank scores.
+            * ``"reciprocal_ratio"``    — float, fraction of edges with a
+                                          reverse edge.
+            * ``"hub_neighbor_count"``  — list[int], number of distinct
+                                          out-neighbours of each vertex's
+                                          out-neighbours (1-hop hub set size).
+            * ``"two_hop_size"``        — list[int], 2-hop reachable set size.
+
         dataset_name:
             Convenience accessor — mirrors ``graph["dataset_name"]``.
         is_valid:
@@ -73,6 +91,9 @@ class PreparedGraph:
         # Use lookup for fast edge access.
         weight = prepared.lookup.get_edge_weight(src_id, dst_id)
 
+        # Access pre-computed feature arrays.
+        indegrees = prepared.baseline_features.get("indegree", [])
+
         # Pass the original graph to an analysis.
         analysis.run(prepared.graph)
     """
@@ -81,6 +102,7 @@ class PreparedGraph:
     validation_report: ValidationReport
     metadata: GraphMetadata
     lookup: GraphLookup
+    baseline_features: dict = field(default_factory=dict)
     dataset_name: str = ""
     is_valid: bool = True
 
@@ -95,11 +117,12 @@ class PreparedGraph:
 
         logger.info(
             "[Preprocessing/PreparedGraph] Created PreparedGraph for '%s' | "
-            "valid=%s nodes=%d edges=%d",
+            "valid=%s nodes=%d edges=%d features=%s",
             self.dataset_name,
             self.is_valid,
             self.metadata.node_count,
             self.metadata.edge_count,
+            list(self.baseline_features.keys()),
         )
 
     # ------------------------------------------------------------------ #
@@ -120,7 +143,8 @@ class PreparedGraph:
             f"PreparedGraph(dataset={self.dataset_name!r}, "
             f"nodes={self.metadata.node_count}, "
             f"edges={self.metadata.edge_count}, "
-            f"valid={self.is_valid})"
+            f"valid={self.is_valid}, "
+            f"features={list(self.baseline_features.keys())})"
         )
 
     def __repr__(self) -> str:

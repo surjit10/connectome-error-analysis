@@ -283,7 +283,6 @@ class GraphValidator:
         self, graph: igraph.Graph, report: ValidationReport
     ) -> None:
         """Detect edges from a vertex to itself."""
-        loop_edges = graph.es.select(_source_eq=None)  # placeholder; use is_loop
         # igraph provides is_loop() on EdgeSeq
         loop_indices = [e.index for e in graph.es if graph.is_loop(e.index)]
 

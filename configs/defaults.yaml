@@ -1,0 +1,65 @@
+# FlyWire Research Framework – Default Configuration
+# ====================================================
+# These values are merged first. Any dataset-, error-model-, or
+# experiment-level config OVERRIDES keys here.
+# Do NOT put biological parameters here; this file is pure infrastructure.
+
+framework:
+  version: "1.0.0"
+
+# ---------------------------------------------------------------------------
+# Data loading defaults
+# ---------------------------------------------------------------------------
+loader:
+  # Maximum rows used for schema inference.
+  infer_schema_length: 10000
+  # Column types that must be parsed as string, not downcast.
+  id_columns:
+    - root_id
+    - pre_root_id
+    - post_root_id
+
+# ---------------------------------------------------------------------------
+# Preprocessing defaults
+# ---------------------------------------------------------------------------
+preprocessing:
+  raise_on_error: false
+  expected_node_attrs: []
+  expected_edge_attrs: []
+  # Vertex attributes for which to build an inverted attribute index.
+  index_node_attrs:
+    - super_class
+    - class_
+    - soma_side
+    - predicted_nt_type
+    - top_region
+    - flow
+    - body_part
+  # Baseline feature extraction switches.
+  features:
+    indegree: true
+    outdegree: true
+    total_degree: true
+    pagerank: true
+    pagerank_damping: 0.85
+    reciprocal_ratio: true
+    hub_neighbor_count: true
+    two_hop_size: true
+
+# ---------------------------------------------------------------------------
+# Experiment runner defaults
+# ---------------------------------------------------------------------------
+runner:
+  # If true, the runner also executes baseline analyses (no error model).
+  run_baseline_analyses: true
+  # If true, export is called automatically after each run.
+  auto_export: false
+  # Root directory for experiment result packages.
+  output_root: "results/"
+  create_zip: true
+
+# ---------------------------------------------------------------------------
+# Statistics defaults
+# ---------------------------------------------------------------------------
+statistics:
+  confidence_level: 0.95

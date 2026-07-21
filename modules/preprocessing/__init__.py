@@ -6,11 +6,16 @@ Public surface of the preprocessing package.
 Downstream components (Experiment Runner, Analysis Framework, Error Model
 Framework) should import from this package, not from the sub-modules directly.
 
+This package operates exclusively on :class:`igraph.Graph` objects.
+NetworkX is not used.
+
 Typical usage::
 
     from modules.preprocessing import preprocess_graph, PreparedGraph
 
     prepared = preprocess_graph(graph)
+    # Access pre-computed baseline features:
+    indegrees = prepared.baseline_features.get("indegree", [])
 """
 
 from .validator import GraphValidator, ValidationReport, ValidationSeverity
@@ -32,3 +37,4 @@ __all__ = [
     "ValidationReport",
     "ValidationSeverity",
 ]
+

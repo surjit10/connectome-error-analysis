@@ -1,0 +1,16 @@
+# configs/schemas/experiment_schema.yaml
+# Defines the required keys for a valid experiment configuration YAML.
+
+required_keys:
+  - dataset_name
+  - dataset_root
+
+optional_keys:
+  - error_model_name
+  - error_model_config
+  - analysis_names
+  - analysis_configs
+  - preprocessing_config
+  - seed
+  - experiment_id
+  - runner

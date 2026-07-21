@@ -1,0 +1,21 @@
+# configs/datasets/fafb.yaml
+# Full Adult Fly Brain (FAFB) dataset configuration.
+
+name: FAFB
+version: "630"
+description: "Full Adult Fly Brain connectome produced by the FlyWire project."
+is_fafb: true
+
+# Files expected inside the dataset directory.
+files:
+  neurons: "neurons.csv.gz"
+  classification: "classification.csv.gz"
+  cell_types: "consolidated_cell_types.csv.gz"
+  connections: "connections_princeton.csv.gz"
+
+# Required columns for structural validation.
+required_neuron_columns:
+  - root_id
+required_connection_columns:
+  - pre_root_id
+  - post_root_id

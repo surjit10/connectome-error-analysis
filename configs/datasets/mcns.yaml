@@ -1,0 +1,15 @@
+# configs/datasets/mcns.yaml
+name: MCNS
+version: "1.0"
+description: "Male Central Nervous System connectome."
+is_fafb: false
+
+files:
+  neurons: "neurons.csv.gz"
+  connections: "connections_princeton.csv.gz"
+
+required_neuron_columns:
+  - root_id
+required_connection_columns:
+  - pre_root_id
+  - post_root_id

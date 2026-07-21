@@ -1,0 +1,15 @@
+# configs/datasets/banc.yaml
+name: BANC
+version: "1.0"
+description: "Brain And Nerve Cord connectome."
+is_fafb: false
+
+files:
+  neurons: "neurons.csv.gz"
+  connections: "connections_princeton.csv.gz"
+
+required_neuron_columns:
+  - root_id
+required_connection_columns:
+  - pre_root_id
+  - post_root_id

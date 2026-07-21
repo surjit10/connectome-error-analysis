@@ -1,0 +1,12 @@
+# configs/schemas/dataset_schema.yaml
+# Defines the required keys for a valid dataset configuration YAML.
+# Used by ConfigManager for validation.
+
+required_keys:
+  - name
+  - version
+  - files
+
+files_required_keys:
+  - neurons
+  - connections
