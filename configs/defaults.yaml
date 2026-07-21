@@ -63,3 +63,22 @@ runner:
 # ---------------------------------------------------------------------------
 statistics:
   confidence_level: 0.95
+  # ── Vector-valued metric comparison (Phase 017) ───────────────────
+  # Parameters for comparing vector-valued graph analysis metrics across
+  # baseline and perturbed trials.  Each analysis can override these.
+  #
+  # top_k_overlap:        Number of top-ranked nodes to consider for
+  #                       PageRank / Betweenness Top-K overlap metric.
+  # pagerank:
+  #   compute_spearman:   Whether to compute Spearman rank correlation.
+  #   compute_pearson:    Whether to compute Pearson correlation.
+  # degree_distribution:
+  #   compute_ks:         Whether to compute Kolmogorov–Smirnov statistic.
+  #   compute_wasserstein: Whether to compute Wasserstein distance.
+  top_k_overlap: 100
+  pagerank:
+    compute_spearman: true
+    compute_pearson: true
+  degree_distribution:
+    compute_ks: true
+    compute_wasserstein: true
