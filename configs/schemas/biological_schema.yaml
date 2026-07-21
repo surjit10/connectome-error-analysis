@@ -1,0 +1,4 @@
+required_keys:
+  - synapse_weight
+  - source_degree_weight
+  - target_degree_weight

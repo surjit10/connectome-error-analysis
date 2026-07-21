@@ -61,6 +61,7 @@ from .validator import GraphValidator, ValidationReport
 from .metadata import build_metadata, GraphMetadata
 from .lookup import build_lookup, GraphLookup
 from .prepared_graph import PreparedGraph
+from .biological_features import extract_biological_features
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +197,13 @@ def preprocess_graph(
         lookup=lookup,
         baseline_features=baseline_features,
     )
+
+    # ------------------------------------------------------------------ #
+    # Step 6: Biological Edge Feature Extraction                           #
+    # ------------------------------------------------------------------ #
+    
+    edge_features = extract_biological_features(prepared)
+    prepared.edge_features = edge_features
 
     logger.info(
         "[Preprocessing/Pipeline] Preprocessing complete. %s",

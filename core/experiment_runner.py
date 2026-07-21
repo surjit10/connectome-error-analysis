@@ -61,6 +61,8 @@ from typing import Any, Dict, List, Optional
 
 import igraph
 
+from core.checkpoint_manager import CheckpointManager
+
 from core.data_loader import load_dataset, FlyWireDataset
 from core.graph_builder import GraphBuilder, GraphBuilderError
 from modules.preprocessing import preprocess_graph, PreparedGraph, PreprocessingError
@@ -376,6 +378,96 @@ class ExperimentRunner:
             return
         result.prepared_graph = prepared
 
+        # ── Step 3.5: Checkpoint Phase 012 ───────────────────────────────
+        if config.output_root:
+            try:
+                cm = CheckpointManager(Path(config.output_root) / "checkpoints")
+                # Need biological assumptions
+                from modules.error_models.biology import BiologicalAssumptions
+                
+                biological_config = BiologicalAssumptions.from_config(config) if hasattr(BiologicalAssumptions, "from_config") else None
+                
+                cm.save_phase_012_checkpoint(
+                    experiment_name=config.experiment_id,
+                    metadata=prepared.metadata,
+                    biological_assumptions=biological_config,
+                    edge_feature_table=prepared.edge_features,
+                    validation_results=prepared.validation_report
+                )
+            except Exception as exc:
+                logger.warning(f"[ExperimentRunner] Failed to save Phase 012 checkpoint: {exc}")
+
+        # ── Step 3.6: Biological Vulnerability (Phase 013) ───────────────
+        from modules.error_models.biology import BiologicalAssumptions
+        from modules.error_models.vulnerability import VulnerabilityModel
+        
+        try:
+            bio_assumptions = BiologicalAssumptions.from_config(config)
+            vuln_model = VulnerabilityModel(assumptions=bio_assumptions)
+            
+            if prepared.edge_features is not None:
+                vuln_table = vuln_model.compute_scores(prepared.edge_features)
+                setattr(prepared, "edge_vulnerability", vuln_table)
+                
+                if config.output_root:
+                    try:
+                        cm = CheckpointManager(Path(config.output_root) / "checkpoints")
+                        cm.save_phase_013_checkpoint(
+                            experiment_name=config.experiment_id,
+                            metadata=prepared.metadata,
+                            vulnerability_model_parameters=bio_assumptions,
+                            edge_vulnerability_table=vuln_table,
+                            validation_results="VALIDATED"
+                        )
+                    except Exception as exc:
+                        logger.warning(f"[ExperimentRunner] Failed to save Phase 013 checkpoint: {exc}")
+                        
+        except Exception as exc:
+            msg = f"Phase 013 Vulnerability Model failed: {exc}"
+            logger.error("[ExperimentRunner] %s", msg)
+            result.errors.append(msg)
+            result.status = ExperimentStatus.FAILED
+            return
+
+        # ── Step 3.7: Probability Calibration (Phase 014) ────────────────
+        from modules.error_models.calibration import ProbabilityCalibrator
+        
+        try:
+            target_error_rate = float(config.error_model_config.get("error_rate", 0.0))
+            # Optional calibration configs
+            calibration_config = config.error_model_config.get("biology", {}).get("calibration", {})
+            max_iter = int(calibration_config.get("max_iterations", 50))
+            tol = float(calibration_config.get("tolerance", 1e-6))
+            
+            if hasattr(prepared, "edge_vulnerability"):
+                calibrator = ProbabilityCalibrator(
+                    target_error_rate=target_error_rate,
+                    max_iterations=max_iter,
+                    tolerance=tol
+                )
+                calibrated_table = calibrator.calibrate(prepared.edge_vulnerability)
+                setattr(prepared, "calibrated_probabilities", calibrated_table)
+                
+                if config.output_root:
+                    try:
+                        cm = CheckpointManager(Path(config.output_root) / "checkpoints")
+                        cm.save_phase_014_checkpoint(
+                            experiment_name=config.experiment_id,
+                            metadata=prepared.metadata,
+                            target_error_rate=target_error_rate,
+                            edge_probability_table=calibrated_table,
+                            validation_results="VALIDATED"
+                        )
+                    except Exception as exc:
+                        logger.warning(f"[ExperimentRunner] Failed to save Phase 014 checkpoint: {exc}")
+                        
+        except Exception as exc:
+            msg = f"Phase 014 Probability Calibration failed: {exc}"
+            logger.error("[ExperimentRunner] %s", msg)
+            result.errors.append(msg)
+            result.status = ExperimentStatus.FAILED
+            return
+
         # ── Step 4: Run baseline analyses (optional) ─────────────────────
         if config.baseline_analysis_names:
             self._step_run_baseline_analyses(prepared, config, result)
@@ -408,6 +500,20 @@ class ExperimentRunner:
             )
             if temp_prepared is not None:
                 analysis_target = temp_prepared
+                
+                # ── Step 3.10: Checkpoint Phase 015 ──────────────────────
+                if config.output_root and error_result:
+                    try:
+                        cm = CheckpointManager(Path(config.output_root) / "checkpoints")
+                        cm.save_phase_015_checkpoint(
+                            experiment_name=config.experiment_id,
+                            metadata=prepared.metadata,
+                            simulation_statistics=error_result.perturbation_metadata,
+                            perturbed_graph_info={"nodes": temp_prepared.graph.vcount(), "edges": temp_prepared.graph.ecount()},
+                            validation_results="VALIDATED"
+                        )
+                    except Exception as exc:
+                        logger.warning(f"[ExperimentRunner] Failed to save Phase 015 checkpoint: {exc}")
 
         # ── Step 7: Run analyses ─────────────────────────────────────────
         if config.analysis_names:
@@ -662,6 +768,23 @@ class ExperimentRunner:
                 name, target, config, result, is_baseline=False
             )
             result.analysis_results.append(a_result)
+
+        # ── Step 7.5: Checkpoint Phase 016 ──────────────────────────────
+        if config.output_root and result.analysis_results:
+            try:
+                from core.checkpoint_manager import CheckpointManager
+                cm = CheckpointManager(Path(config.output_root) / "checkpoints")
+                analysis_dump = {
+                    ar.analysis_name: ar.metrics for ar in result.analysis_results
+                }
+                cm.save_phase_016_checkpoint(
+                    experiment_name=config.experiment_id,
+                    metadata=target.metadata,
+                    analysis_results=analysis_dump,
+                    validation_results="VALIDATED"
+                )
+            except Exception as exc:
+                logger.warning(f"[ExperimentRunner] Failed to save Phase 016 checkpoint: {exc}")
 
     def _run_single_analysis(
         self,

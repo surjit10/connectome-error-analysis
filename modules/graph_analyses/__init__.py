@@ -53,3 +53,9 @@ __all__ = [
     "InvalidInputError",
     "RegistryError",
 ]
+
+# Auto-register all known analyses
+from . import structural
+from . import network_statistics
+from . import centrality
+from . import biological

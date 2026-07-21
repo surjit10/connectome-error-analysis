@@ -27,6 +27,10 @@ import igraph
 from .metadata import GraphMetadata
 from .lookup import GraphLookup
 from .validator import ValidationReport
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from modules.preprocessing.biological_features import EdgeFeatureTable
+
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +107,7 @@ class PreparedGraph:
     metadata: GraphMetadata
     lookup: GraphLookup
     baseline_features: dict = field(default_factory=dict)
+    edge_features: Optional['EdgeFeatureTable'] = None
     dataset_name: str = ""
     is_valid: bool = True
 
@@ -144,7 +149,8 @@ class PreparedGraph:
             f"nodes={self.metadata.node_count}, "
             f"edges={self.metadata.edge_count}, "
             f"valid={self.is_valid}, "
-            f"features={list(self.baseline_features.keys())})"
+            f"features={list(self.baseline_features.keys())}, "
+            f"edge_features={'Present' if self.edge_features else 'Missing'})"
         )
 
     def __repr__(self) -> str:

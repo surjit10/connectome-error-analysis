@@ -58,3 +58,6 @@ __all__ = [
     "InvalidInputError",
     "ErrorRegistryError",
 ]
+
+# Auto-register standard models
+from . import missed_synapses
