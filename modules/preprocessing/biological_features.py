@@ -30,7 +30,7 @@ class EdgeFeatureTable:
         missing = [c for c in required_cols if c not in self.features.columns]
         if missing:
             raise ValueError(f"Missing required columns in EdgeFeatureTable: {missing}")
-        if self.features.null_count().sum().item() > 0:
+        if sum(self.features.null_count().row(0)) > 0:
             raise ValueError("EdgeFeatureTable contains missing (NaN/null) values.")
         logger.info(f"[BiologicalFeatures] EdgeFeatureTable validated successfully with {len(self.features)} edges.")
 

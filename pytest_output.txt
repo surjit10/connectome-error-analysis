@@ -1,0 +1,153 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /home/surjit/Desktop/flywire/v1/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/surjit/Desktop/flywire/v1
+plugins: cov-7.1.0
+collecting ... collected 1 item
+
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline FAILED  [100%]
+
+=================================== FAILURES ===================================
+_________________________ test_complete_demo_pipeline __________________________
+
+tmp_path = PosixPath('/tmp/pytest-of-surjit/pytest-10/test_complete_demo_pipeline0')
+
+    def test_complete_demo_pipeline(tmp_path):
+        """
+        Validates the complete execution pipeline (Phase 001-018) locally using the TEST_v1 dataset.
+        This guarantees every framework component remains stable across experiments.
+        """
+        ds_name = "TEST"
+        err_model = "missed_synapses"
+        err_rate = 0.10
+        seed = 42
+    
+        output_base = tmp_path / "results"
+        trial_base = output_base / ds_name / err_model / "10_percent" / "trial_001"
+        baseline_trial = output_base / ds_name / err_model / "0_percent" / "trial_001"
+    
+        biology_config = {
+            "weights": {
+                "synapse_weight": 1.0,
+                "source_degree_weight": 1.0,
+                "target_degree_weight": 1.0
+            }
+        }
+    
+        baseline_config = ExperimentConfig(
+            dataset_name=ds_name,
+            dataset_root="0-demodata",
+            error_model_name=err_model,
+            error_model_config={"error_rate": 0.0, "biology": biology_config},
+            analysis_names=["basic_structure", "degree_distribution"],
+            preprocessing_config={"features": {"degree": True, "synapse_counts": True}},
+            seed=seed,
+            output_root=str(baseline_trial),
+            create_zip=False,
+            extra={"metadata": {"experiment_name": "Test Validation"}}
+        )
+    
+        perturbed_config = ExperimentConfig(
+            dataset_name=ds_name,
+            dataset_root="0-demodata",
+            error_model_name=err_model,
+            error_model_config={"error_rate": err_rate, "biology": biology_config},
+            analysis_names=["basic_structure", "degree_distribution"],
+            preprocessing_config={"features": {"degree": True, "synapse_counts": True}},
+            seed=seed,
+            output_root=str(trial_base),
+            create_zip=True,
+            extra={"metadata": {"experiment_name": "Test Validation"}}
+        )
+    
+        # Run Phase 001-016
+        runner = ExperimentRunner(analysis_registry, error_registry)
+    
+        res_base = runner.run(baseline_config)
+        assert res_base.succeeded, f"Baseline failed: {res_base.errors}"
+    
+        res_pert = runner.run(perturbed_config)
+        assert res_pert.succeeded, f"Perturbed failed: {res_pert.errors}"
+    
+        # Run Phase 017
+        evaluator = StatisticalEvaluator()
+        eval_result = evaluator.evaluate([res_base], [res_pert])
+        assert eval_result is not None
+        assert eval_result.dataset_name == "TEST"
+    
+        aggregated = {0.10: eval_result}
+    
+        # Run Phase 018
+        ExportManager().export_presentation(
+            results_by_rate=aggregated,
+            output_root=output_base,
+            metadata={"experiment_name": "Test Validation"}
+        )
+    
+        # Assertions for Phase 012-016 Checkpoints
+        assert (trial_base / "checkpoints").exists()
+        assert any((trial_base / "checkpoints").glob("*_phase_015.pkl"))
+    
+        # Assertions for ExportManager
+>       assert (trial_base / "metadata.json").exists()
+E       AssertionError: assert False
+E        +  where False = exists()
+E        +    where exists = (PosixPath('/tmp/pytest-of-surjit/pytest-10/test_complete_demo_pipeline0/results/TEST/missed_synapses/10_percent/trial_001') / 'metadata.json').exists
+
+tests/test_demo_dataset_pipeline.py:89: AssertionError
+=============================== warnings summary ===============================
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+  /home/surjit/Desktop/flywire/v1/core/experiment_runner.py:143: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    ts = datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+  /home/surjit/Desktop/flywire/v1/core/experiment_runner.py:302: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    started_at = datetime.datetime.utcnow().isoformat() + "Z"
+
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+  /home/surjit/Desktop/flywire/v1/modules/preprocessing/metadata.py:126: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    preprocessing_timestamp=datetime.datetime.utcnow().isoformat() + "Z",
+
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+  /home/surjit/Desktop/flywire/v1/core/experiment_runner.py:334: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    result.finished_at     = datetime.datetime.utcnow().isoformat() + "Z"
+
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+  /home/surjit/Desktop/flywire/v1/core/export_manager.py:126: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    ts = datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+  /home/surjit/Desktop/flywire/v1/presentation/dashboard_serializer.py:21: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    timestamp=datetime.datetime.utcnow().isoformat() + "Z"
+
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+  /home/surjit/Desktop/flywire/v1/presentation/graph_generator.py:122: UserWarning: No artists with labels found to put in legend.  Note that artists whose label start with an underscore are ignored when legend() is called with no argument.
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+  /home/surjit/Desktop/flywire/v1/.venv/lib/python3.12/site-packages/seaborn/matrix.py:243: PendingDeprecationWarning: The set_bad function will be deprecated in a future version. Use cmap.with_extremes(bad=...) or Colormap(bad=...) instead.
+    self.cmap.set_bad(bad)
+
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+  /home/surjit/Desktop/flywire/v1/.venv/lib/python3.12/site-packages/seaborn/matrix.py:202: RuntimeWarning: All-NaN slice encountered
+    vmin = np.nanmin(calc_data)
+
+tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline
+  /home/surjit/Desktop/flywire/v1/.venv/lib/python3.12/site-packages/seaborn/matrix.py:207: RuntimeWarning: All-NaN slice encountered
+    vmax = np.nanmax(calc_data)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_demo_dataset_pipeline.py::test_complete_demo_pipeline - Ass...
+======================== 1 failed, 21 warnings in 5.18s ========================

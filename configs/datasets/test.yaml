@@ -1,0 +1,14 @@
+name: TEST
+version: "1.0"
+description: "Synthetic miniature dataset for local framework validation."
+is_fafb: false
+
+files:
+  neurons: "neurons.csv"
+  connections: "connections.csv"
+
+required_neuron_columns:
+  - root_id
+required_connection_columns:
+  - pre_root_id
+  - post_root_id

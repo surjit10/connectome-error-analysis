@@ -1,8 +1,0 @@
-feat: implement presentation export layer (Phase 018)
-
-- Created `presentation` module containing `PresentationExporter`, `DashboardSerializer`, and `GraphGenerator`.
-- Generated automated JSON and CSV schemas (`dashboard_data.json`, `global_statistics.csv`) explicitly for downstream HCI loading.
-- Implemented Seaborn plotting engine to automatically render publication-ready statistical comparisons (Effect Size vs Error Rate, CIs, Boxplots, Heatmaps).
-- Extended `core/export_manager.py` to seamlessly orchestrate global presentation package archiving and zip compression.
-- Updated `experiments_missed_synapses.ipynb` Kaggle pipeline to invoke Phase 018 immediately after statistical aggregation.
-- Documented full Kaggle execution and artifact pipeline within the architecture analysis (0-reference/architecture analysis/4-kaggle output analysis.md).
