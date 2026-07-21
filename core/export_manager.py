@@ -158,6 +158,28 @@ class ExportManager:
         logger.info("[ExportManager] Export complete. %s", pkg.summary())
         return pkg
 
+    def export_presentation(
+        self,
+        results_by_rate: Dict[float, Any],
+        output_root: Path,
+        metadata: Dict[str, Any]
+    ) -> None:
+        """
+        Phase 018 - Orchestrates the presentation export.
+        Called after Phase 017 completes.
+        """
+        try:
+            from presentation.presentation_export import PresentationExporter
+            exporter = PresentationExporter(
+                output_root=output_root,
+                experiment_name=metadata.get("experiment_name", "experiment"),
+                metadata=metadata
+            )
+            exporter.export(results_by_rate)
+            logger.info("[ExportManager] Presentation export complete.")
+        except Exception as exc:
+            logger.error("[ExportManager] Presentation export failed: %s", exc)
+
     # ------------------------------------------------------------------ #
     # Individual writers                                                   #
     # ------------------------------------------------------------------ #

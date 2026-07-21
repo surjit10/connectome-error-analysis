@@ -1,12 +1,8 @@
-feat: complete biological simulation & statistical analysis pipeline (Phases 011-017)
+feat: implement presentation export layer (Phase 018)
 
-Implemented the full biological perturbation and statistical evaluation pipeline for the FlyWire framework:
-
-- Phase 011 & 012 (Biological Layer Foundation): Implemented BiologicalAssumptions and EdgeFeatureTable. Integrated edge feature extraction using Polars into the preprocessing pipeline.
-- Phase 013 (Vulnerability Model): Added VulnerabilityModel mapping edge metrics (synapses, degrees, PageRank) to raw biological vulnerability scores.
-- Phase 014 (Probability Calibration): Implemented ProbabilityCalibrator ensuring iterative mass-redistribution maps biological vulnerability to strict removal probabilities conforming to target global error rates.
-- Phase 015 (Stochastic Simulation): Developed MissedSynapsesModel using independent binomial trials to simulate probabilistic synapse loss, strictly isolating topological mutation from baseline.
-- Phase 016 (Graph Analysis): Integrated Tier 1 (Structural) and Tier 2 (Network Statistics) analyzers (node/edge counts, WCC/SCC, PageRank, etc.) without altering baseline topologies.
-- Phase 017 (Statistical Evaluation): Built StatisticalEvaluator implementing Cohen's d effect sizes to compare aggregated stochastic perturbation results against the biological baseline (0% error).
-- Checkpoint Integration: Created persistent Phase 012-017 pipeline serialization hooks within CheckpointManager.
-- Orchestration: Updated the master Kaggle experiment launcher notebook to handle multi-rate batch execution and final statistical aggregation.
+- Created `presentation` module containing `PresentationExporter`, `DashboardSerializer`, and `GraphGenerator`.
+- Generated automated JSON and CSV schemas (`dashboard_data.json`, `global_statistics.csv`) explicitly for downstream HCI loading.
+- Implemented Seaborn plotting engine to automatically render publication-ready statistical comparisons (Effect Size vs Error Rate, CIs, Boxplots, Heatmaps).
+- Extended `core/export_manager.py` to seamlessly orchestrate global presentation package archiving and zip compression.
+- Updated `experiments_missed_synapses.ipynb` Kaggle pipeline to invoke Phase 018 immediately after statistical aggregation.
+- Documented full Kaggle execution and artifact pipeline within the architecture analysis (0-reference/architecture analysis/4-kaggle output analysis.md).
