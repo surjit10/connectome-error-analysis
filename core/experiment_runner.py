@@ -8,6 +8,15 @@ The runner is a **pure orchestrator**: it calls public APIs from Phases
 004–008 but never implements graph algorithms, perturbation logic, or
 statistics.
 
+Architecture changes vs original:
+    - No ``graph.copy()`` anywhere.  The baseline igraph.Graph is immutable.
+    - Error models return an ``ErrorResult`` containing ``edge_mask`` and
+      ``weight_updates`` instead of a perturbed graph copy.
+    - The runner builds a **temporary** igraph subgraph from the baseline +
+      edge_mask for the duration of analysis, then deletes it immediately.
+    - Results are exported and released after every experiment (Priority 8).
+    - A ``RuntimeMonitor`` records RAM + wall time (Priority 9).
+
 Execution pipeline::
 
     ExperimentConfig
@@ -22,39 +31,18 @@ Execution pipeline::
     Preprocessing          (modules.preprocessing.preprocess_graph)
             │
             ▼
-    PreparedGraph
+    PreparedGraph  (immutable baseline — never modified)
             │
             ├──── Error Model ────┐   (modules.error_models.registry)
             │                    │
-            │             Perturbed Graph
+            │             ErrorResult (edge_mask + weight_updates)
             │                    │
-            │             Preprocessing  (optional second pass)
+            │      Build temp igraph subgraph from mask
             │                    │
             └──── Analyses ←─────┘   (modules.graph_analyses.registry)
                     │
                     ▼
-            ExperimentResult
-
-Usage::
-
-    from core.experiment_runner import ExperimentRunner, ExperimentConfig
-    from modules.graph_analyses import registry as analysis_registry
-    from modules.error_models  import registry as error_registry
-
-    config = ExperimentConfig(
-        dataset_name="FAFB",
-        dataset_root="/data/flywire",
-        error_model_name="missed_synapses",
-        error_model_config={"removal_rate": 0.05},
-        analysis_names=["degree", "centrality"],
-        seed=42,
-    )
-
-    runner = ExperimentRunner(
-        analysis_registry=analysis_registry,
-        error_registry=error_registry,
-    )
-    result = runner.run(config)
+            ExperimentResult → Export → Delete temp graph → Next experiment
 """
 
 from __future__ import annotations
@@ -67,6 +55,8 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+import igraph
 
 from core.data_loader import load_dataset, FlyWireDataset
 from core.graph_builder import GraphBuilder, GraphBuilderError
@@ -93,7 +83,7 @@ class ExperimentConfig:
     Attributes:
         dataset_name:
             Name of the FlyWire dataset to load (e.g. ``"FAFB"``,
-            ``"MANC"``).  Passed verbatim to :func:`~core.data_loader.load_dataset`.
+            ``"MANC"``).
         dataset_root:
             Path to the directory that contains the dataset folders.
         error_model_name:
@@ -104,21 +94,15 @@ class ExperimentConfig:
             Configuration dict forwarded to the error model's ``execute()``
             call.  May be empty.
         analysis_names:
-            Ordered list of analysis names to run (must all be registered in
-            the :class:`~modules.graph_analyses.analysis_registry.AnalysisRegistry`).
-            Each analysis runs after the perturbation step.
+            Ordered list of analysis names to run.
         analysis_configs:
             Optional per-analysis config dicts keyed by analysis name.
-            Analyses not listed here receive an empty dict.
         preprocessing_config:
-            Optional kwargs forwarded to :func:`~modules.preprocessing.preprocess_graph`
-            (e.g. ``{"expected_edge_attrs": ["syn_count"], "raise_on_error": True}``).
+            Optional kwargs forwarded to :func:`~modules.preprocessing.preprocess_graph`.
         seed:
-            Optional integer random seed forwarded to the error model for
-            reproducibility.
+            Optional integer random seed forwarded to the error model.
         experiment_id:
-            Optional human-readable identifier for this experiment.  If not
-            provided, a timestamp-based ID is generated automatically.
+            Optional human-readable identifier.  Auto-generated if omitted.
         extra:
             Free-form metadata stored in the result but not used by the runner.
     """
@@ -160,7 +144,6 @@ class ExperimentResult:
     """Orchestration output of a single experiment run.
 
     Consumed downstream by Phase 010 (Statistics Engine + Export Manager).
-    Neither phase should need to know how the results were produced.
 
     Attributes:
         experiment_id:         Identifier copied from :class:`ExperimentConfig`.
@@ -172,6 +155,7 @@ class ExperimentResult:
                                ``None`` for baseline runs.
         analysis_results:      Ordered list of :class:`~modules.graph_analyses.AnalysisResult`.
         runtime_seconds:       Total wall-clock time for the complete pipeline.
+        peak_ram_mb:           Peak RAM usage during the run (MB), if monitored.
         started_at:            ISO-8601 UTC timestamp when the run began.
         finished_at:           ISO-8601 UTC timestamp when the run ended.
         warnings:              Non-fatal warnings from the pipeline.
@@ -187,6 +171,7 @@ class ExperimentResult:
     error_result: Optional[ErrorResult] = None
     analysis_results: List[AnalysisResult] = field(default_factory=list)
     runtime_seconds: float = 0.0
+    peak_ram_mb: float = 0.0
     started_at: str = ""
     finished_at: str = ""
     warnings: List[str] = field(default_factory=list)
@@ -219,6 +204,7 @@ class ExperimentResult:
             "status":           self.status.value,
             "dataset_name":     self.dataset_name,
             "runtime_seconds":  self.runtime_seconds,
+            "peak_ram_mb":      self.peak_ram_mb,
             "started_at":       self.started_at,
             "finished_at":      self.finished_at,
             "error_model":      self.error_result.model_name if self.error_result else None,
@@ -256,22 +242,13 @@ class ExperimentRunner:
     Args:
         analysis_registry:
             The :class:`~modules.graph_analyses.analysis_registry.AnalysisRegistry`
-            singleton.  Import from ``modules.graph_analyses``.
+            singleton.
         error_registry:
             The :class:`~modules.error_models.error_registry.ErrorRegistry`
-            singleton.  Import from ``modules.error_models``.
+            singleton.
         graph_builder:
             Optional :class:`~core.graph_builder.GraphBuilder` instance.
             A default instance is created if not provided.
-
-    Example::
-
-        from core.experiment_runner import ExperimentRunner, ExperimentConfig
-        from modules.graph_analyses import registry as a_reg
-        from modules.error_models  import registry as e_reg
-
-        runner = ExperimentRunner(analysis_registry=a_reg, error_registry=e_reg)
-        result = runner.run(config)
     """
 
     def __init__(
@@ -364,6 +341,9 @@ class ExperimentRunner:
             result.status = ExperimentStatus.FAILED
             return
 
+        # Release the raw dataframes — graph holds all required data.
+        del dataset
+
         # ── Step 3: Preprocess graph ────────────────────────────────────
         prepared = self._step_preprocess(graph, config, result)
         if prepared is None:
@@ -372,33 +352,45 @@ class ExperimentRunner:
         result.prepared_graph = prepared
 
         # ── Step 4: Apply error model (optional) ────────────────────────
-        analysis_target: PreparedGraph = prepared   # default: baseline
+        error_result: Optional[ErrorResult] = None
 
         if config.error_model_name:
-            error_result, perturbed = self._step_apply_error_model(
-                prepared, config, result
-            )
+            error_result = self._step_apply_error_model(prepared, config, result)
             result.error_result = error_result
 
-            if perturbed is not None:
-                analysis_target = perturbed          # analyses run on perturbed graph
-            elif error_result and error_result.status == ErrorModelStatus.FAILED:
-                # Non-fatal: log, warn, fall back to baseline.
+            if error_result and error_result.status == ErrorModelStatus.FAILED:
                 msg = (
                     f"Error model '{config.error_model_name}' failed; "
                     "running analyses on baseline graph."
                 )
                 logger.warning("[ExperimentRunner] %s", msg)
                 result.warnings.append(msg)
+                error_result = None  # fall back to baseline
 
-        # ── Step 5: Run analyses ────────────────────────────────────────
+        # ── Step 5: Build temporary analysis graph ──────────────────────
+        # If an error model produced a mask, build a temporary subgraph.
+        # Otherwise analyses run directly on the immutable baseline graph.
+        temp_graph: Optional[igraph.Graph] = None
+        analysis_target: PreparedGraph = prepared   # default: baseline
+
+        if error_result is not None and error_result.edge_mask is not None:
+            temp_graph, temp_prepared = self._build_temp_graph(
+                prepared, error_result, config, result
+            )
+            if temp_prepared is not None:
+                analysis_target = temp_prepared
+
+        # ── Step 6: Run analyses ────────────────────────────────────────
         if config.analysis_names:
             self._step_run_analyses(analysis_target, config, result)
 
-        # Mark success only if we reach here without a FAILED status set
-        # by an earlier step.
-        if result.status == ExperimentStatus.SUCCESS:
-            pass   # status already correct; partial detection happens in run()
+        # ── Step 7: Destroy temporary graph immediately ──────────────────
+        if temp_graph is not None:
+            del temp_graph
+            del analysis_target
+            logger.debug(
+                "[ExperimentRunner] Temporary perturbed graph released."
+            )
 
     # ------------------------------------------------------------------ #
     # Step implementations                                                 #
@@ -431,14 +423,14 @@ class ExperimentRunner:
         self,
         dataset: FlyWireDataset,
         result: ExperimentResult,
-    ) -> Optional[Any]:
+    ) -> Optional[igraph.Graph]:
         """Delegate to :class:`~core.graph_builder.GraphBuilder`."""
         logger.info("[ExperimentRunner] Building graph.")
         try:
             graph = self._graph_builder.build(dataset)
             logger.info(
                 "[ExperimentRunner] Graph built: %d nodes, %d edges.",
-                graph.number_of_nodes(), graph.number_of_edges(),
+                graph.vcount(), graph.ecount(),
             )
             return graph
         except GraphBuilderError as exc:
@@ -449,7 +441,7 @@ class ExperimentRunner:
 
     def _step_preprocess(
         self,
-        graph: Any,
+        graph: igraph.Graph,
         config: ExperimentConfig,
         result: ExperimentResult,
     ) -> Optional[PreparedGraph]:
@@ -483,11 +475,11 @@ class ExperimentRunner:
         prepared: PreparedGraph,
         config: ExperimentConfig,
         result: ExperimentResult,
-    ) -> tuple:
+    ) -> Optional[ErrorResult]:
         """Instantiate and execute the configured error model.
 
-        Returns:
-            ``(ErrorResult, perturbed PreparedGraph | None)``
+        Returns an :class:`ErrorResult` containing ``edge_mask`` and
+        ``weight_updates``.  The baseline graph is never touched.
         """
         name = config.error_model_name
         logger.info("[ExperimentRunner] Applying error model '%s'.", name)
@@ -499,7 +491,7 @@ class ExperimentRunner:
             msg = f"Could not instantiate error model '{name}': {exc}"
             logger.error("[ExperimentRunner] %s", msg)
             result.errors.append(msg)
-            return None, None
+            return None
 
         # ── Execute ─────────────────────────────────────────────────────
         error_result: ErrorResult = model.execute(
@@ -507,17 +499,73 @@ class ExperimentRunner:
             config=config.error_model_config,
             seed=config.seed,
         )
+        return error_result
 
-        if error_result.status != ErrorModelStatus.SUCCESS:
-            return error_result, None
+    def _build_temp_graph(
+        self,
+        prepared: PreparedGraph,
+        error_result: ErrorResult,
+        config: ExperimentConfig,
+        result: ExperimentResult,
+    ) -> tuple:
+        """Build a temporary igraph subgraph from the baseline + edge_mask.
 
-        # ── Preprocess the perturbed graph ───────────────────────────────
-        # The perturbed graph is a raw nx.DiGraph; wrap it in a PreparedGraph
-        # so that analyses always receive the full framework contract.
+        The baseline graph is read-only.  The temporary graph is a new
+        igraph.Graph containing only the edges where ``edge_mask[i] == True``,
+        with any ``weight_updates`` applied.
+
+        Returns:
+            ``(temp_graph, temp_PreparedGraph)`` on success, or
+            ``(None, None)`` on failure.
+        """
+        logger.info("[ExperimentRunner] Building temporary perturbed subgraph.")
+
         try:
-            perturbed_prepared = preprocess_graph(
-                error_result.perturbed_graph,
-                # Inherit the same preprocessing config as the baseline.
+            baseline: igraph.Graph = prepared.graph
+            mask: List[bool] = error_result.edge_mask
+            weight_updates: Dict[int, float] = error_result.weight_updates
+
+            # Collect active edge indices.
+            active_edge_indices = [
+                i for i, active in enumerate(mask) if active
+            ]
+
+            # Build the subgraph using igraph's subgraph_edges.
+            # This creates a new igraph.Graph that does NOT share references
+            # with the baseline — it is safe to discard after analysis.
+            temp_graph: igraph.Graph = baseline.subgraph_edges(
+                active_edge_indices, delete_vertices=False
+            )
+
+            # Apply weight updates to the temporary graph.
+            # Map from baseline edge index to temp graph edge index via
+            # the active_edge_indices positional mapping.
+            if weight_updates:
+                baseline_to_temp: Dict[int, int] = {
+                    baseline_idx: temp_idx
+                    for temp_idx, baseline_idx in enumerate(active_edge_indices)
+                }
+                weight_attr = (
+                    "syn_count"
+                    if "syn_count" in temp_graph.edge_attributes()
+                    else "weight"
+                )
+                if weight_attr in temp_graph.edge_attributes():
+                    for baseline_idx, new_weight in weight_updates.items():
+                        temp_idx = baseline_to_temp.get(baseline_idx)
+                        if temp_idx is not None:
+                            temp_graph.es[temp_idx][weight_attr] = new_weight
+
+            # Copy graph-level metadata from baseline so preprocessing works.
+            for attr in baseline.attributes():
+                temp_graph[attr] = baseline[attr]
+            # Update edge/node counts to reflect the subgraph.
+            temp_graph["edge_count"] = temp_graph.ecount()
+            temp_graph["node_count"] = temp_graph.vcount()
+
+            # Wrap in a PreparedGraph (lightweight — no deep preprocessing).
+            temp_prepared = preprocess_graph(
+                temp_graph,
                 expected_node_attrs=config.preprocessing_config.get(
                     "expected_node_attrs"
                 ),
@@ -528,16 +576,17 @@ class ExperimentRunner:
                     "index_node_attrs"
                 ),
             )
+
+            return temp_graph, temp_prepared
+
         except Exception as exc:  # noqa: BLE001
             msg = (
-                f"Preprocessing of perturbed graph failed: {exc}. "
+                f"Failed to build temporary perturbed subgraph: {exc}. "
                 "Analyses will run on baseline graph."
             )
             logger.warning("[ExperimentRunner] %s", msg)
             result.warnings.append(msg)
-            return error_result, None
-
-        return error_result, perturbed_prepared
+            return None, None
 
     def _step_run_analyses(
         self,
@@ -556,7 +605,6 @@ class ExperimentRunner:
                 msg = f"Could not instantiate analysis '{name}': {exc}"
                 logger.error("[ExperimentRunner] %s", msg)
                 result.errors.append(msg)
-                # Record a failed placeholder so the caller knows this ran.
                 placeholder = AnalysisResult(
                     analysis_name=name,
                     status=AnalysisStatus.FAILED,

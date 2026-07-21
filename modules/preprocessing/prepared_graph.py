@@ -1,7 +1,7 @@
 """
 Phase 006 – Preprocessing / PreparedGraph
 ==========================================
-Wraps a NetworkX DiGraph together with the products of preprocessing
+Wraps an igraph.Graph together with the products of preprocessing
 (validation report, metadata, lookup index) into a single, stable object
 that the Experiment Runner receives.
 
@@ -22,7 +22,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-import networkx as nx
+import igraph
 
 from .metadata import GraphMetadata
 from .lookup import GraphLookup
@@ -35,16 +35,17 @@ logger = logging.getLogger(__name__)
 class PreparedGraph:
     """The central output of Phase 006 Preprocessing.
 
-    Wraps a :class:`networkx.DiGraph` with its associated preprocessing
+    Wraps an :class:`igraph.Graph` with its associated preprocessing
     artifacts.  All downstream phases (Experiment Runner, Analysis Framework,
     Error Model Framework) receive this object and should use it instead of
     the raw graph wherever possible.
 
     Attributes:
         graph:
-            The original :class:`networkx.DiGraph` produced by the Phase 005
+            The original :class:`igraph.Graph` produced by the Phase 005
             Graph Builder.  **Do not mutate this object.**  Error models must
-            work on *copies* of this graph.
+            work on the edge-mask / weight-array abstraction, never on copies
+            of this graph.
         validation_report:
             :class:`~modules.preprocessing.validator.ValidationReport`
             produced by :class:`~modules.preprocessing.validator.GraphValidator`.
@@ -55,11 +56,10 @@ class PreparedGraph:
             :class:`~modules.preprocessing.lookup.GraphLookup` providing O(1)
             lookup structures.
         dataset_name:
-            Convenience accessor — mirrors ``graph.graph["dataset_name"]``.
+            Convenience accessor — mirrors ``graph["dataset_name"]``.
         is_valid:
             ``True`` when the validation report contains no ERROR-level
-            findings.  A ``False`` value means downstream components should
-            decide whether to proceed with caution or abort.
+            findings.
 
     Example::
 
@@ -77,7 +77,7 @@ class PreparedGraph:
         analysis.run(prepared.graph)
     """
 
-    graph: nx.DiGraph
+    graph: igraph.Graph
     validation_report: ValidationReport
     metadata: GraphMetadata
     lookup: GraphLookup
@@ -87,8 +87,9 @@ class PreparedGraph:
     def __post_init__(self) -> None:
         # Synchronise convenience fields from the report/graph after init.
         if not self.dataset_name:
-            self.dataset_name = self.metadata.dataset_name or self.graph.graph.get(
-                "dataset_name", "<unknown>"
+            self.dataset_name = (
+                self.metadata.dataset_name
+                or self.graph["dataset_name"]
             )
         self.is_valid = self.validation_report.passed
 

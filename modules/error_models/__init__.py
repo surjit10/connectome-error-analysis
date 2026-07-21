@@ -14,7 +14,9 @@ Typical Experiment Runner usage::
     result = model.execute(prepared_graph, config={"removal_rate": 0.05})
 
     if result.status == ErrorModelStatus.SUCCESS:
-        analysis.execute(result.perturbed_graph)
+        # result.edge_mask is a bool list — True = active edge.
+        # The runner builds the temp subgraph from this mask.
+        pass
 
 Typical concrete model authoring::
 
@@ -23,8 +25,11 @@ Typical concrete model authoring::
     class MissedSynapses(BaseErrorModel):
         NAME = "missed_synapses"
 
-        def _perturb(self, graph_copy, config, result):
-            ...  # biological perturbation logic (Phase 011+)
+        def _perturb(self, prepared, config, result, rng):
+            n = prepared.graph.ecount()
+            rate = config.get("removal_rate", 0.05)
+            mask = rng.random(n) >= rate
+            result.edge_mask = mask.tolist()
 
     registry.register(MissedSynapses)
 """

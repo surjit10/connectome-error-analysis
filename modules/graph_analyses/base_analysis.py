@@ -65,10 +65,12 @@ class BaseAnalysis(abc.ABC):
             NAME = "degree"
 
             def _run(self, prepared, config, result):
-                in_degs  = dict(prepared.graph.in_degree())
-                out_degs = dict(prepared.graph.out_degree())
-                result.metrics["mean_in_degree"]  = sum(in_degs.values())  / len(in_degs)
-                result.metrics["mean_out_degree"] = sum(out_degs.values()) / len(out_degs)
+                # prepared.graph is an igraph.Graph (directed).
+                in_degs  = prepared.graph.indegree()
+                out_degs = prepared.graph.outdegree()
+                n = prepared.graph.vcount()
+                result.metrics["mean_in_degree"]  = sum(in_degs)  / n if n else 0.0
+                result.metrics["mean_out_degree"] = sum(out_degs) / n if n else 0.0
     """
 
     # Subclasses MUST override this with a unique, non-empty string.

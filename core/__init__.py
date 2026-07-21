@@ -9,6 +9,7 @@ from .experiment_runner import (
 from .statistics_engine import StatisticsEngine, ExperimentStatistics, MetricStats, AnalysisStats
 from .metadata_manager import MetadataManager, ExperimentMetadata
 from .export_manager import ExportManager, ExportPackage
+from .runtime_monitor import RuntimeMonitor, RuntimeReport, RuntimeSnapshot
 
 __all__ = [
     "load_dataset",
@@ -27,5 +28,8 @@ __all__ = [
     "ExperimentMetadata",
     "ExportManager",
     "ExportPackage",
+    "RuntimeMonitor",
+    "RuntimeReport",
+    "RuntimeSnapshot",
 ]
 

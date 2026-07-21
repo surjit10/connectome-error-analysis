@@ -1,7 +1,7 @@
 """
 Phase 006 – Preprocessing / Graph Lookup Index
 ===============================================
-Builds a set of O(1) lookup structures over a NetworkX DiGraph so that
+Builds a set of O(1) lookup structures over an igraph.Graph so that
 downstream components (Analysis Framework, Error Models, Experiment Runner)
 can query graph topology without repeatedly traversing the graph.
 
@@ -11,14 +11,14 @@ All structures are built **once** during preprocessing and stored in
 Design constraints:
     - Read-only view of the graph. Nothing is modified.
     - No graph metrics or statistics are computed here.
-    - Lightweight wrappers are preferred over deep copies of large data.
-    - All lookups operate on node IDs exactly as present in the graph.
+    - Lightweight wrappers preferred over deep copies of large data.
+    - All lookups operate on biological root_id values exactly as loaded.
 
-Memory note:
-    For graphs with millions of edges the successor / predecessor dicts
-    and edge-weight dict can be large. They use shallow references to
-    existing Python objects in the graph's adjacency structure wherever
-    possible to avoid unnecessary duplication.
+Biological ID note:
+    igraph uses internal integer vertex indices (0..N-1).
+    The ``GraphLookup`` translates all public-facing queries to/from
+    root_id values using the ``id_to_idx`` / ``id_map`` mappings stored in
+    the graph by the Graph Builder.
 """
 
 from __future__ import annotations
@@ -27,64 +27,64 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, FrozenSet, List, Optional, Set
 
-import networkx as nx
+import igraph
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class GraphLookup:
-    """Pre-computed lookup/index structures for a FlyWire DiGraph.
+    """Pre-computed lookup/index structures for a FlyWire igraph.Graph.
 
     Produced by :func:`build_lookup` and attached to
     :class:`~modules.preprocessing.prepared_graph.PreparedGraph`.
 
-    All mappings use the graph's native node ID type (typically ``int``
-    for FlyWire ``root_id`` values).
+    All mappings use biological root_id values (not igraph vertex indices).
 
     Attributes:
         node_set:
-            ``frozenset`` of all node IDs.  O(1) membership tests.
+            ``frozenset`` of all root_id values.  O(1) membership tests.
+
+        id_to_idx:
+            ``{root_id: igraph_vertex_index}`` — forward mapping.
+
+        id_map:
+            ``{igraph_vertex_index: root_id}`` — reverse mapping.
 
         node_attrs:
-            ``{node_id: {attr_name: value, ...}}`` — direct reference to
-            the graph's internal node attribute dicts (no copy).
+            ``{root_id: {attr_name: value, ...}}`` — vertex attribute dicts
+            keyed by biological ID.
 
         successors:
-            ``{node_id: [neighbour_id, ...]}`` — out-neighbours (post-synaptic
-            partners) for each node.
+            ``{root_id: [neighbour_root_id, ...]}`` — out-neighbours.
 
         predecessors:
-            ``{node_id: [neighbour_id, ...]}`` — in-neighbours (pre-synaptic
-            partners) for each node.
+            ``{root_id: [neighbour_root_id, ...]}`` — in-neighbours.
 
         adjacency_out:
-            ``{src: {dst: edge_attr_dict, ...}}`` — direct reference to
-            NetworkX's internal adjacency structure for out-edges.
-            Use for O(1) edge-attr access.
+            ``{src_root_id: {dst_root_id: {attr: val, ...}, ...}}`` —
+            out-edge attribute lookup.
 
         adjacency_in:
-            ``{dst: {src: edge_attr_dict, ...}}`` — reverse adjacency for
-            in-edges.
+            ``{dst_root_id: {src_root_id: {attr: val, ...}, ...}}`` —
+            in-edge attribute lookup.
 
         edge_attrs:
-            ``{(src, dst): edge_attr_dict}`` — flat edge lookup by endpoint
-            pair.  References the same dicts stored in the graph.
+            ``{(src_root_id, dst_root_id): {attr: val, ...}}`` —
+            flat edge lookup by biological endpoint pair.
 
         edge_weight:
-            ``{(src, dst): float | int | None}`` — synapse count (``syn_count``)
-            if present, else ``weight`` if present, else ``None``.  Provides a
-            single canonical weight lookup regardless of the attribute name used.
+            ``{(src_root_id, dst_root_id): float | None}`` — syn_count
+            (or weight) if present, else None.
 
         node_attr_index:
-            ``{attr_name: {value: [node_id, ...], ...}}`` — inverted index
-            that maps attribute values back to the list of nodes that carry
-            them.  Useful for queries such as "find all neurons where
-            super_class == 'interneuron'".  Built only for a configurable
-            set of node attribute keys.
+            ``{attr_name: {value: [root_id, ...]}}`` — inverted attribute
+            index built for a configurable set of vertex attribute keys.
     """
 
     node_set: FrozenSet[Any] = field(default_factory=frozenset)
+    id_to_idx: Dict[Any, int] = field(default_factory=dict)
+    id_map: Dict[int, Any] = field(default_factory=dict)
     node_attrs: Dict[Any, Dict[str, Any]] = field(default_factory=dict)
     successors: Dict[Any, List[Any]] = field(default_factory=dict)
     predecessors: Dict[Any, List[Any]] = field(default_factory=dict)
@@ -105,7 +105,7 @@ class GraphLookup:
     # ------------------------------------------------------------------ #
 
     def has_node(self, node_id: Any) -> bool:
-        """Return ``True`` if *node_id* exists in the graph."""
+        """Return ``True`` if *node_id* (root_id) exists in the graph."""
         return node_id in self.node_set
 
     def has_edge(self, src: Any, dst: Any) -> bool:
@@ -113,11 +113,11 @@ class GraphLookup:
         return (src, dst) in self.edge_attrs
 
     def get_successors(self, node_id: Any) -> List[Any]:
-        """Return the out-neighbour list for *node_id* (empty if absent)."""
+        """Return the out-neighbour root_id list (empty if absent)."""
         return self.successors.get(node_id, [])
 
     def get_predecessors(self, node_id: Any) -> List[Any]:
-        """Return the in-neighbour list for *node_id* (empty if absent)."""
+        """Return the in-neighbour root_id list (empty if absent)."""
         return self.predecessors.get(node_id, [])
 
     def get_edge_weight(self, src: Any, dst: Any) -> Optional[float]:
@@ -129,12 +129,7 @@ class GraphLookup:
         return self.edge_attrs.get((src, dst), {})
 
     def get_nodes_by_attr(self, attr_name: str, value: Any) -> List[Any]:
-        """Return all node IDs where ``attr_name == value``.
-
-        Requires *attr_name* to have been included in the index (see
-        :func:`build_lookup`).  Returns an empty list if the attribute was
-        not indexed or the value is not present.
-        """
+        """Return all root_id values where ``attr_name == value``."""
         return self.node_attr_index.get(attr_name, {}).get(value, [])
 
 
@@ -143,22 +138,22 @@ class GraphLookup:
 # ---------------------------------------------------------------------------
 
 def build_lookup(
-    graph: nx.DiGraph,
+    graph: igraph.Graph,
     index_node_attrs: Optional[List[str]] = None,
 ) -> GraphLookup:
     """Build and return a :class:`GraphLookup` for *graph*.
 
-    The graph is traversed in a single pass (plus optional attribute index
-    pass) without modification.
+    The graph is traversed in a single pass without modification.
 
     Args:
         graph:
-            A :class:`networkx.DiGraph` from the Phase 005 Graph Builder.
+            An :class:`igraph.Graph` from the Phase 005 Graph Builder.
+            Must have vertex attribute "root_id" and graph attributes
+            "id_to_idx" and "id_map" set by the builder.
         index_node_attrs:
-            Optional list of node attribute names for which to build an
+            Optional list of vertex attribute names for which to build an
             inverted index.  Defaults to a standard set of FlyWire biological
-            attributes: ``["super_class", "class_", "soma_side",
-            "predicted_nt_type", "top_region"]``.
+            attributes.
 
     Returns:
         A fully populated :class:`GraphLookup`.
@@ -174,73 +169,94 @@ def build_lookup(
             "body_part",
         ]
 
+    dataset_name = (
+        graph["dataset_name"]
+        if "dataset_name" in graph.attributes()
+        else "<unknown>"
+    )
     logger.info(
         "[Preprocessing/Lookup] Building lookup structures for '%s' "
         "(%d nodes, %d edges) ...",
-        graph.graph.get("dataset_name", "<unknown>"),
-        graph.number_of_nodes(),
-        graph.number_of_edges(),
+        dataset_name,
+        graph.vcount(),
+        graph.ecount(),
     )
 
-    # ------------------------------------------------------------------ #
-    # Node structures                                                      #
-    # ------------------------------------------------------------------ #
-
-    # node_set – frozenset for O(1) membership.
-    node_set: FrozenSet[Any] = frozenset(graph.nodes())
-
-    # node_attrs – shallow reference, no copy of individual dicts.
-    node_attrs: Dict[Any, Dict[str, Any]] = dict(graph.nodes(data=True))
-
-    # successors / predecessors – materialised into plain lists once so
-    # downstream code does not have to call graph.successors() repeatedly.
-    successors: Dict[Any, List[Any]] = {
-        n: list(graph.successors(n)) for n in graph.nodes()
-    }
-    predecessors: Dict[Any, List[Any]] = {
-        n: list(graph.predecessors(n)) for n in graph.nodes()
-    }
+    # Retrieve the ID mappings stored by the Graph Builder.
+    id_to_idx: Dict[Any, int] = graph["id_to_idx"] if "id_to_idx" in graph.attributes() else {}
+    id_map: Dict[int, Any] = graph["id_map"] if "id_map" in graph.attributes() else {}
 
     # ------------------------------------------------------------------ #
-    # Adjacency structures                                                 #
+    # Vertex attribute structures                                          #
     # ------------------------------------------------------------------ #
 
-    # adjacency_out – reference to NetworkX's internal adj dict (no copy).
-    adjacency_out: Dict[Any, Dict] = dict(graph.adj)
+    has_root_id = "root_id" in graph.vertex_attributes()
+    vertex_attr_names = graph.vertex_attributes()
 
-    # adjacency_in – reverse adjacency.
-    adjacency_in: Dict[Any, Dict] = dict(graph.pred)
+    node_set: FrozenSet[Any] = frozenset(id_map.values()) if id_map else frozenset()
+
+    node_attrs: Dict[Any, Dict[str, Any]] = {}
+    successors: Dict[Any, List[Any]] = {}
+    predecessors: Dict[Any, List[Any]] = {}
+
+    for v in graph.vs:
+        root_id = v["root_id"] if has_root_id else v.index
+        # Build attribute dict for this vertex.
+        v_attrs = {attr: v[attr] for attr in vertex_attr_names}
+        node_attrs[root_id] = v_attrs
+
+        # Successors (out-neighbours) — translated to root_ids.
+        succ_indices = graph.successors(v.index)
+        successors[root_id] = [
+            id_map.get(i, i) for i in succ_indices
+        ]
+
+        # Predecessors (in-neighbours) — translated to root_ids.
+        pred_indices = graph.predecessors(v.index)
+        predecessors[root_id] = [
+            id_map.get(i, i) for i in pred_indices
+        ]
 
     # ------------------------------------------------------------------ #
-    # Edge structures                                                      #
+    # Edge attribute structures                                            #
     # ------------------------------------------------------------------ #
 
     _weight_key_priority = ("syn_count", "weight")
+    edge_attr_names = graph.edge_attributes()
 
     edge_attrs: Dict[tuple, Dict[str, Any]] = {}
     edge_weight: Dict[tuple, Optional[float]] = {}
+    adjacency_out: Dict[Any, Dict[Any, Dict[str, Any]]] = {n: {} for n in node_set}
+    adjacency_in: Dict[Any, Dict[Any, Dict[str, Any]]] = {n: {} for n in node_set}
 
-    for src, dst, attrs in graph.edges(data=True):
-        key = (src, dst)
-        edge_attrs[key] = attrs  # shallow reference
+    for e in graph.es:
+        src_root = id_map.get(e.source, e.source) if has_root_id else e.source
+        dst_root = id_map.get(e.target, e.target) if has_root_id else e.target
+
+        e_attrs = {attr: e[attr] for attr in edge_attr_names}
+        key = (src_root, dst_root)
+        edge_attrs[key] = e_attrs
 
         # Resolve canonical weight.
         w: Optional[float] = None
         for wk in _weight_key_priority:
-            if wk in attrs:
-                w = attrs[wk]
+            if wk in e_attrs and e_attrs[wk] is not None:
+                w = e_attrs[wk]
                 break
         edge_weight[key] = w
 
+        adjacency_out.setdefault(src_root, {})[dst_root] = e_attrs
+        adjacency_in.setdefault(dst_root, {})[src_root] = e_attrs
+
     # ------------------------------------------------------------------ #
-    # Inverted node attribute index                                        #
+    # Inverted vertex attribute index                                      #
     # ------------------------------------------------------------------ #
 
     node_attr_index: Dict[str, Dict[Any, List[Any]]] = {
         attr: {} for attr in index_node_attrs
     }
 
-    for node_id, attrs in graph.nodes(data=True):
+    for root_id, attrs in node_attrs.items():
         for attr in index_node_attrs:
             val = attrs.get(attr)
             if val is None:
@@ -248,7 +264,7 @@ def build_lookup(
             bucket = node_attr_index[attr]
             if val not in bucket:
                 bucket[val] = []
-            bucket[val].append(node_id)
+            bucket[val].append(root_id)
 
     # ------------------------------------------------------------------ #
     # Assemble and return                                                  #
@@ -256,6 +272,8 @@ def build_lookup(
 
     lookup = GraphLookup(
         node_set=node_set,
+        id_to_idx=id_to_idx,
+        id_map=id_map,
         node_attrs=node_attrs,
         successors=successors,
         predecessors=predecessors,

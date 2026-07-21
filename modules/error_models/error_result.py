@@ -5,15 +5,19 @@ Defines :class:`ErrorResult`, the single stable return type of every concrete
 error model that subclasses
 :class:`~modules.error_models.base_error_model.BaseErrorModel`.
 
-Design constraints:
-    - Generic: must hold the output of any future perturbation model
-      (missed synapses, false positives, merge errors, split errors, etc.).
-    - Contains no experiment-specific fields.
-    - All fields are plain Python types (except the perturbed graph) so the
-      object can be logged and summarised without domain knowledge.
-    - The perturbed graph is a new ``nx.DiGraph`` produced by the concrete
-      model — the original ``PreparedGraph`` is never modified.
-    - Mirrors the structure of ``AnalysisResult`` (Phase 007) for consistency.
+Design changes vs original:
+    - ``perturbed_graph`` field is **removed**.
+      Error models no longer produce graph copies.
+    - Added ``edge_mask``: a boolean list parallel to the baseline graph's
+      edge sequence.  True = edge is active; False = edge is suppressed.
+    - Added ``weight_updates``: a dict mapping edge index → new weight value
+      for edges whose syn_count (or weight) should be scaled.
+    - These two objects together fully describe a perturbation without
+      ever copying the baseline graph.
+    - The Experiment Runner is responsible for building the temporary
+      analysis subgraph from the baseline + mask + weight_updates.
+
+All other fields remain identical to the original contract.
 """
 
 from __future__ import annotations
@@ -21,8 +25,6 @@ from __future__ import annotations
 import enum
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
-
-import networkx as nx
 
 
 # ---------------------------------------------------------------------------
@@ -44,33 +46,37 @@ class ErrorModelStatus(enum.Enum):
 class ErrorResult:
     """Standardised result produced by every concrete error model.
 
-    The Experiment Runner receives this object and passes the perturbed graph
-    to an Analysis.  It must not inspect internal perturbation details.
+    The Experiment Runner receives this object and uses ``edge_mask`` and
+    ``weight_updates`` to construct a temporary analysis subgraph.
+    It must not inspect internal perturbation details beyond these fields.
 
     Attributes:
         model_name:
-            The canonical name of the error model (matches the key used in
-            :class:`~modules.error_models.error_registry.ErrorRegistry`).
+            The canonical name of the error model.
         status:
             One of ``SUCCESS``, ``FAILED``, or ``SKIPPED``.
         dataset_name:
-            Name of the source dataset (copied from
-            ``PreparedGraph.dataset_name``).
+            Name of the source dataset.
         runtime_seconds:
             Wall-clock execution time in seconds.
         config_snapshot:
             Shallow copy of the configuration dict passed to the model.
-        perturbed_graph:
-            A *new* :class:`networkx.DiGraph` that is a perturbed copy of the
-            original graph.  ``None`` when ``status != SUCCESS``.
+        edge_mask:
+            Boolean list, length == graph.ecount() of the baseline graph.
+            ``True`` means the edge remains active.
+            ``False`` means the edge is suppressed (treated as missing).
+            ``None`` when ``status != SUCCESS``.
+        weight_updates:
+            Dict mapping igraph edge index → updated weight value.
+            Only edges whose weight differs from the baseline are listed.
+            Empty dict if no weight changes were made.
         perturbation_metadata:
-            Free-form dict describing what was changed (e.g.
-            ``{"edges_removed": 42, "removal_rate": 0.05}``).
-            Populated by concrete models; empty by default.
+            Free-form dict describing what was changed
+            (e.g. ``{"edges_removed": 42, "removal_rate": 0.05}``).
         warnings:
-            List of non-fatal warning messages produced during execution.
+            Non-fatal warning messages produced during execution.
         errors:
-            List of error messages (populated when ``status == FAILED``).
+            Error messages (populated when ``status == FAILED``).
         extra:
             Reserved for future extensions.
     """
@@ -80,7 +86,8 @@ class ErrorResult:
     dataset_name: str = ""
     runtime_seconds: float = 0.0
     config_snapshot: Dict[str, Any] = field(default_factory=dict)
-    perturbed_graph: Optional[nx.DiGraph] = None
+    edge_mask: Optional[List[bool]] = None
+    weight_updates: Dict[int, float] = field(default_factory=dict)
     perturbation_metadata: Dict[str, Any] = field(default_factory=dict)
     warnings: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
@@ -101,23 +108,33 @@ class ErrorResult:
         return self.status == ErrorModelStatus.FAILED
 
     @property
-    def has_perturbed_graph(self) -> bool:
-        """``True`` when a perturbed graph is available."""
-        return self.perturbed_graph is not None
+    def has_perturbation(self) -> bool:
+        """``True`` when a valid edge_mask is available."""
+        return self.edge_mask is not None
 
     # ------------------------------------------------------------------ #
     # Serialisation helpers                                                #
     # ------------------------------------------------------------------ #
 
     def to_dict(self) -> Dict[str, Any]:
-        """Return a plain ``dict`` (omits the graph object itself)."""
+        """Return a plain ``dict`` (omits the mask itself; stores summary)."""
+        active = (
+            sum(self.edge_mask) if self.edge_mask is not None else None
+        )
+        suppressed = (
+            len(self.edge_mask) - active
+            if (self.edge_mask is not None and active is not None)
+            else None
+        )
         return {
             "model_name":             self.model_name,
             "status":                 self.status.value,
             "dataset_name":           self.dataset_name,
             "runtime_seconds":        self.runtime_seconds,
             "config_snapshot":        self.config_snapshot,
-            "has_perturbed_graph":    self.has_perturbed_graph,
+            "active_edges":           active,
+            "suppressed_edges":       suppressed,
+            "weight_update_count":    len(self.weight_updates),
             "perturbation_metadata":  self.perturbation_metadata,
             "warnings":               self.warnings,
             "errors":                 self.errors,
@@ -131,7 +148,7 @@ class ErrorResult:
             f"status={self.status.value}, "
             f"dataset={self.dataset_name!r}, "
             f"runtime={self.runtime_seconds:.3f}s, "
-            f"perturbed_graph={'yes' if self.has_perturbed_graph else 'no'})"
+            f"has_perturbation={self.has_perturbation})"
         )
 
     def __repr__(self) -> str:

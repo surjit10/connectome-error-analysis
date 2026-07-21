@@ -7,21 +7,21 @@ Only genuinely cross-cutting helpers live here.  Biological logic,
 specific perturbation strategies, and graph algorithms must never be
 placed here.
 
-Mirrors the utility pattern from Phase 007 (``modules/graph_analyses/utils.py``)
-but operates on :class:`~modules.error_models.error_result.ErrorResult`
-rather than ``AnalysisResult`` to maintain a clean separation of concerns.
-
 Currently provides:
     - :func:`require_config_key` — assert a required key is in a config dict.
     - :func:`validate_config_keys` — warn on unrecognised config keys.
     - :func:`add_warning` — consistent helper to append a warning.
-    - :func:`init_numpy_seed` — optional helper for models using NumPy RNG.
+
+Note: ``init_numpy_seed`` has been removed.  All randomness is now managed
+via ``numpy.random.default_rng(seed)`` inside
+:meth:`~modules.error_models.base_error_model.BaseErrorModel.execute`.
+Concrete models receive the RNG object as a parameter in ``_perturb()``.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable
 
 from .error_result import ErrorResult
 from .exceptions import InvalidInputError
@@ -93,23 +93,3 @@ def add_warning(result: ErrorResult, message: str) -> None:
     """
     logger.warning("[ErrorModel/%s] %s", result.model_name, message)
     result.warnings.append(message)
-
-
-def init_numpy_seed(seed: Optional[int]) -> None:
-    """Initialise NumPy's global random state with *seed*.
-
-    Only call this if your error model uses ``numpy.random`` functions.
-    Models using only the stdlib ``random`` module are handled automatically
-    by :meth:`~modules.error_models.base_error_model.BaseErrorModel._init_seed`.
-
-    Args:
-        seed: Integer seed, or ``None`` to skip initialisation.
-    """
-    if seed is None:
-        return
-    try:
-        import numpy as np  # optional dependency
-        np.random.seed(seed)
-        logger.debug("[ErrorModel/utils] NumPy random seed set to %d.", seed)
-    except ImportError:
-        logger.debug("[ErrorModel/utils] NumPy not available; seed not applied.")
