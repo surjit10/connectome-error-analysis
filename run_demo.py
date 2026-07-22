@@ -1,3 +1,23 @@
+"""
+Local Demo Runner
+=================
+End-to-end smoke test for the Connectome Error Analysis framework using the
+small synthetic **TEST** dataset in ``0-demodata/``.
+
+Pipeline executed
+-----------------
+1. **Baseline** (0 % error)  — run the full analysis pipeline with no perturbation.
+2. **Perturbed** (10 % error) — re-run after applying the *missed_synapses* error model.
+3. **Statistical evaluation**  — compare baseline vs. perturbed metric distributions.
+4. **Export** — serialise results to ``results/TEST/missed_synapses/``.
+
+Usage::
+
+    python run_demo.py
+
+Output will be written to the ``results/`` directory (ignored by git).
+"""
+
 from pathlib import Path
 from core.experiment_runner import ExperimentRunner, ExperimentConfig
 from modules.error_models.error_registry import registry as error_registry
@@ -7,6 +27,7 @@ from core.export_manager import ExportManager
 import warnings
 
 warnings.filterwarnings("ignore")
+
 
 def run_demo():
     ds_name = "TEST"
@@ -61,7 +82,7 @@ def run_demo():
     print("Exporting Presentation Layer...")
     ExportManager().export_presentation(
         results_by_rate={0.10: eval_result},
-        output_root=Path("results"),
+        output_root=Path("results/TEST/missed_synapses"),
         metadata={"experiment_name": "Demo Experiment"}
     )
     print("Done! Check the 'results/' directory.")

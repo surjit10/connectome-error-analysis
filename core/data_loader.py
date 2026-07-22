@@ -117,7 +117,10 @@ def _load_csv(filepath: Path) -> pl.DataFrame:
     never downcast.
     """
     if not filepath.exists():
-        raise DataLoaderError(f"File not found: {filepath}")
+        if filepath.suffix == '.gz' and filepath.with_suffix('').exists():
+            filepath = filepath.with_suffix('')
+        else:
+            raise DataLoaderError(f"File not found: {filepath}")
     try:
         return pl.read_csv(filepath, infer_schema_length=10_000)
     except Exception as exc:

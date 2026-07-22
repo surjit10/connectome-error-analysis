@@ -21,7 +21,13 @@ __pycache__/
 # Virtual environment
 .venv/
 
-# Local reference and documentation (untracked per user request)
+# Local storage / backup — not part of the committed codebase
+0-storage/
+.freebuff/
 
+# Scratch helper scripts used only during development
+generate_test_dataset.py
+update_notebook_*.py
+pytest_output.txt
 
 results/
