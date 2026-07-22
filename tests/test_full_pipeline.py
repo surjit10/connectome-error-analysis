@@ -45,10 +45,11 @@ def test_full_pipeline(temp_configs, temp_dataset, tmp_path):
     # 1. Pipeline success
     assert result.succeeded
     
-    # 2. Graph checks
-    assert result.prepared_graph is not None
-    assert result.prepared_graph.node_count() == 3
-    assert result.prepared_graph.edge_count() == 3
+    # 2. Graph checks (via analysis results — PreparedGraph is released
+    #    after export for memory management)
+    assert len(result.analysis_results) == 1
+    assert result.analysis_results[0].metrics.get("nodes") == 3
+    assert result.analysis_results[0].metrics.get("edges") == 3
     
     # 3. Error model checks
     assert result.error_result is not None
@@ -57,8 +58,8 @@ def test_full_pipeline(temp_configs, temp_dataset, tmp_path):
     # 4. Baseline analysis checks
     assert len(result.baseline_analysis_results) == 1
     
-    # 5. Analysis checks
-    assert len(result.analysis_results) == 1
+    # 5. Additional analysis checks
+    assert result.analysis_results[0].succeeded
     
     # 6. Export checks
     assert out_dir.exists()

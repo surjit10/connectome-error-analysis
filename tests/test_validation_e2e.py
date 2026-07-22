@@ -241,18 +241,27 @@ class TestSeedReproducibility:
         return runner.run(config)
 
     def test_same_seed_identical_perturbation(self, runner):
-        """Two runs with the same seed must produce identical error results."""
+        """Two runs with the same seed must produce identical error results.
+
+        Note: edge_mask is released after the pipeline completes for memory
+        management (lifecycle change).  We verify reproducibility through:
+        - perturbation_metadata (stays live — the stochastic outcome summary)
+        - analysis results (the downstream effect on metrics)
+        """
         r1 = self.run_with_seed(runner, 42)
         r2 = self.run_with_seed(runner, 42)
 
         assert r1.succeeded and r2.succeeded
         assert r1.error_result is not None and r2.error_result is not None
 
-        # Edge masks must be identical
-        assert r1.error_result.edge_mask == r2.error_result.edge_mask, \
-            "Same seed produced different edge masks!"
+        # Verify perturbation was applied via metadata (edge_mask is released
+        # after pipeline completion for memory management)
+        assert r1.error_result.perturbation_metadata, \
+            "Error result has no perturbation metadata!"
+        assert r2.error_result.perturbation_metadata, \
+            "Error result has no perturbation metadata!"
 
-        # Perturbation metadata must match
+        # Perturbation metadata must be identical
         assert r1.error_result.perturbation_metadata == r2.error_result.perturbation_metadata, \
             "Same seed produced different perturbation metadata!"
 
@@ -263,16 +272,32 @@ class TestSeedReproducibility:
 
     def test_different_seed_different_perturbation(self, runner):
         """Two runs with different seeds should produce different perturbations
-        (with extremely high probability on 10k edges at 10% error)."""
+        (with extremely high probability on 10k edges at 10% error).
+
+        Note: edge_mask is released after the pipeline completes for memory
+        management.  We verify divergence through perturbation_metadata
+        and/or analysis results instead.
+        """
         r1 = self.run_with_seed(runner, 42)
         r2 = self.run_with_seed(runner, 999)
 
         assert r1.succeeded and r2.succeeded
         assert r1.error_result is not None and r2.error_result is not None
+        assert r1.error_result.perturbation_metadata, \
+            "Error result has no perturbation metadata!"
+        assert r2.error_result.perturbation_metadata, \
+            "Error result has no perturbation metadata!"
 
-        # Edge masks should be different (probability of collision ~ 2^-10000)
-        assert r1.error_result.edge_mask != r2.error_result.edge_mask, \
-            "Different seeds produced identical edge masks (extremely unlikely)!"
+        # Check that perturbation_metadata differs between seeds
+        # (the stochastic process produces different removal counts)
+        assert r1.error_result.perturbation_metadata != r2.error_result.perturbation_metadata, \
+            "Different seeds produced identical perturbation results (extremely unlikely)!"
+
+        # Analysis metrics (e.g., edge_count) should also differ
+        ec1 = r1.analysis_results[0].metrics.get("edge_count")
+        ec2 = r2.analysis_results[0].metrics.get("edge_count")
+        assert ec1 != ec2, \
+            f"Different seeds produced same edge count ({ec1})!"
 
     def test_seed_produces_deterministic_edge_count(self, runner):
         """Edge counts from the perturbation should be deterministic given seed."""

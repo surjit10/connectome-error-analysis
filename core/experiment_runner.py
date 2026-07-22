@@ -345,6 +345,14 @@ class ExperimentRunner:
         if config.output_root:
             self._step_export(config, result)
 
+            # ── Release heavyweight graph reference ──────────────────────
+            # PreparedGraph is no longer needed after export.
+            # MetadataManager.collect() captured all serialisable metadata
+            # (graph structure, preprocessing info) into ExperimentMetadata
+            # before this point.  No framework component accesses
+            # result.prepared_graph after export completes.
+            result.prepared_graph = None
+
         return result
 
     # ------------------------------------------------------------------ #
@@ -429,6 +437,13 @@ class ExperimentRunner:
             result.status = ExperimentStatus.FAILED
             return
 
+        # ── Release edge_features after Phase 013 ────────────────────────
+        # The vulnerability model and Phase 013 checkpoint (if configured)
+        # have both consumed edge_features.  No downstream phase needs this
+        # Polars DataFrame — calibration uses edge_vulnerability instead.
+        if prepared.edge_features is not None:
+            prepared.edge_features = None
+
         # ── Step 3.7: Probability Calibration (Phase 014) ────────────────
         from modules.error_models.calibration import ProbabilityCalibrator
         
@@ -467,6 +482,12 @@ class ExperimentRunner:
             result.errors.append(msg)
             result.status = ExperimentStatus.FAILED
             return
+
+        # ── Release edge_vulnerability after Phase 014 ───────────────────
+        # The calibrator and Phase 014 checkpoint have both consumed
+        # edge_vulnerability.  Downstream phases use calibrated_probabilities.
+        if hasattr(prepared, "edge_vulnerability"):
+            prepared.edge_vulnerability = None
 
         # ── Step 4: Run baseline analyses (optional) ─────────────────────
         if config.baseline_analysis_names:
@@ -515,6 +536,12 @@ class ExperimentRunner:
                     except Exception as exc:
                         logger.warning(f"[ExperimentRunner] Failed to save Phase 015 checkpoint: {exc}")
 
+        # ── Release calibrated probabilities after error model ───────────
+        # The error model consumed calibrated_probabilities during execute().
+        # No downstream phase (analyses, statistics, export) needs them.
+        if hasattr(prepared, "calibrated_probabilities"):
+            prepared.calibrated_probabilities = None
+
         # ── Step 7: Run analyses ─────────────────────────────────────────
         if config.analysis_names:
             self._step_run_analyses(analysis_target, config, result)
@@ -526,6 +553,24 @@ class ExperimentRunner:
             logger.debug(
                 "[ExperimentRunner] Temporary perturbed graph released."
             )
+
+        # ── Release edge_mask and weight_updates ─────────────────────────
+        # These were consumed by _build_temp_graph to construct the temporary
+        # subgraph.  Export and statistics only need perturbation_metadata
+        # (separate field), not the full mask or weight updates.
+        if error_result is not None:
+            error_result.edge_mask = None
+            error_result.weight_updates = {}
+
+        # ── Release intermediate DataFrames from PreparedGraph ───────────
+        # edge_features, edge_vulnerability, and calibrated_probabilities
+        # were consumed during their respective pipeline steps.  They are
+        # not accessed by analyses, statistics, or export.
+        # (Already released calibrated_probabilities above.)
+        if hasattr(prepared, "edge_vulnerability"):
+            prepared.edge_vulnerability = None
+        if hasattr(prepared, "edge_features"):
+            prepared.edge_features = None
 
     # ------------------------------------------------------------------ #
     # Step implementations                                                 #

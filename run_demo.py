@@ -42,7 +42,14 @@ def run_demo():
             "error_rate": 0.0, 
             "biology": {"weights": {"synapse_weight": 1.0, "source_degree_weight": 1.0, "target_degree_weight": 1.0}}
         },
-        analysis_names=["basic_structure", "degree_distribution", "pagerank", "centrality", "connected_components", "reciprocity"],
+        analysis_names=[
+            "basic_structure",
+            "degree_distribution",
+            "pagerank",
+            # "centrality",  # Temporarily disabled for runtime profiling (Betweenness + Closeness are intractable on large graphs)
+            "connected_components",
+            "reciprocity",
+        ],
         preprocessing_config={"features": {"degree": True, "synapse_counts": True}},
         seed=42,
         output_root=str(Path("results") / ds_name / err_model / "0_percent" / "trial_001"),
@@ -59,7 +66,14 @@ def run_demo():
             "error_rate": 0.10, 
             "biology": {"weights": {"synapse_weight": 1.0, "source_degree_weight": 1.0, "target_degree_weight": 1.0}}
         },
-        analysis_names=["basic_structure", "degree_distribution", "pagerank", "centrality", "connected_components", "reciprocity"],
+        analysis_names=[
+            "basic_structure",
+            "degree_distribution",
+            "pagerank",
+            # "centrality",  # Temporarily disabled for runtime profiling (Betweenness + Closeness are intractable on large graphs)
+            "connected_components",
+            "reciprocity",
+        ],
         preprocessing_config={"features": {"degree": True, "synapse_counts": True}},
         seed=42,
         output_root=str(Path("results") / ds_name / err_model / "10_percent" / "trial_001"),
