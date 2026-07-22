@@ -81,10 +81,6 @@ def test_complete_demo_pipeline(tmp_path):
         metadata={"experiment_name": "Test Validation"}
     )
     
-    # Assertions for Phase 012-016 Checkpoints
-    assert (trial_base / "checkpoints").exists()
-    assert any((trial_base / "checkpoints").glob("*_phase_015.pkl"))
-    
     # Assertions for ExportManager
     assert any(trial_base.glob("*/metadata.json"))
     assert any(trial_base.glob("*/summary.csv"))

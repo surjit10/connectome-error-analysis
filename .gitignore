@@ -31,3 +31,4 @@ update_notebook_*.py
 pytest_output.txt
 
 results/
+flywire_codebase/
