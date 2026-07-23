@@ -21,6 +21,21 @@
   </p>
 </div>
 
+<!-- Overall Network Integrity Card -->
+<div class="card" style="text-align:center; border-color: var(--accent2);">
+  <h2 style="font-size:1.1rem;">🧬 Overall Network Integrity</h2>
+  <div style="font-size:2.8rem; font-weight:700; color:var(--accent2); font-family:var(--mono);">
+    {{ integrity_score }}%
+  </div>
+  <div style="font-size:1rem; margin-top:0.25rem;">
+    <span style="font-size:1.3rem;">{{ integrity_emoji }}</span>
+    <span class="badge {{ integrity_css }}" style="font-size:0.85rem;">{{ integrity_verdict }}</span>
+  </div>
+  <div style="margin-top:0.75rem; font-size:0.85rem; color:var(--text-muted); line-height:1.5; max-width:600px; margin-left:auto; margin-right:auto;">
+    {{ biological_assessment }}
+  </div>
+</div>
+
 <!-- Metadata sidebar + summary stats -->
 <div class="grid-2 mb-2">
   <div class="card" style="margin-bottom:0">
@@ -37,40 +52,42 @@
     </table>
   </div>
   <div class="card" style="margin-bottom:0">
-    <h2>📊 Quick Stats</h2>
+    <h2>🧬 Network Integrity</h2>
     <table class="data-table">
       <tbody>
-        <tr><td class="text-muted">Sensitive Metrics (|d|≥0.8)</td><td class="mono">{{ n_sensitive }}</td></tr>
-        <tr><td class="text-muted">Max Effect Size |d|</td><td class="mono">{{ max_effect_size }}</td></tr>
-        <tr><td class="text-muted">Most Sensitive</td><td class="mono">{{ top_metric }}</td></tr>
-        <tr><td class="text-muted">Avg Effect Size</td><td class="mono">{{ avg_effect_size }}</td></tr>
+        <tr><td class="text-muted">Integrity Score</td><td class="mono">{{ integrity_score }}%</td></tr>
+        <tr><td class="text-muted">Verdict</td><td><span class="badge {{ integrity_css }}">{{ integrity_emoji }} {{ integrity_verdict }}</span></td></tr>
       </tbody>
     </table>
   </div>
 </div>
 
-<!-- Metrics table -->
+<!-- Structural Preservation section -->
+{% if has_preservation %}
 <div class="card">
-  <h2>📊 Metric Results</h2>
+  <h2>📊 Structural Preservation</h2>
+  <p class="text-muted mt-1" style="font-size:0.82rem;margin-bottom:0.75rem;">
+    Metrics where higher values indicate better biological preservation.
+    Preservation % = (perturbed / baseline) &times; 100, clamped to 0–100%.
+  </p>
+  <div style="overflow-x:auto;">
   <table class="data-table">
     <thead>
       <tr>
-        <th>Analysis</th>
         <th>Metric</th>
-        <th>Baseline Mean</th>
-        <th>Perturbed Mean</th>
+        <th>Baseline</th>
+        <th>Perturbed</th>
         <th>Δ%</th>
         <th>Std</th>
         <th>95% CI</th>
-        <th>Cohen's d</th>
-        <th>Level</th>
+        <th>Preservation (%)</th>
+        <th>Status</th>
       </tr>
     </thead>
     <tbody>
-      {% for row in metric_rows %}
+      {% for row in preservation_rows %}
       <tr>
-        <td class="mono text-muted">{{ row.analysis }}</td>
-        <td class="mono">{{ row.metric }}</td>
+        <td class="mono">{{ row.display_name }}</td>
         <td class="mono">{{ row.baseline_mean }}</td>
         <td class="mono">{{ row.mean }}</td>
         <td class="mono {% if row.delta_sign == '+' %}positive{% else %}negative{% endif %}">
@@ -80,18 +97,82 @@
         <td class="mono">
           [{{ row.ci_lower }}, {{ row.ci_upper }}]
         </td>
-        <td class="mono">{{ row.effect_size }}</td>
-        <td><span class="badge {{ row.effect_label | lower }}">{{ row.effect_label }}</span></td>
+        <td class="mono" style="min-width:120px;">
+          <div class="preservation-bar-container">
+            <div class="preservation-bar-bg">
+              <div class="preservation-bar-fill {{ row.bio_css }}" style="width:{{ row.preservation }}%"></div>
+            </div>
+            <span>{{ row.preservation }}%</span>
+          </div>
+        </td>
+        <td><span class="badge {{ row.bio_css }}">{{ row.bio_emoji }} {{ row.bio_status }}</span></td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Structural Change Indicators section -->
+{% if has_change %}
+<div class="card">
+  <h2>📊 Structural Change Indicators</h2>
+  <p class="text-muted mt-1" style="font-size:0.82rem;margin-bottom:0.75rem;">
+    These metrics describe structural re-organization rather than preservation.
+    The change magnitude and direction are reported instead of a preservation percentage.
+  </p>
+  <div style="overflow-x:auto;">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Baseline</th>
+        <th>Perturbed</th>
+        <th>Δ%</th>
+        <th>Std</th>
+        <th>95% CI</th>
+        <th>Interpretation</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in change_rows %}
+      <tr>
+        <td class="mono">{{ row.display_name }}</td>
+        <td class="mono">{{ row.baseline_mean }}</td>
+        <td class="mono">{{ row.mean }}</td>
+        <td class="mono {% if row.delta_sign == '+' %}positive{% else %}negative{% endif %}">
+          {{ row.delta_pct }}
+        </td>
+        <td class="mono">{{ row.std }}</td>
+        <td class="mono">
+          [{{ row.ci_lower }}, {{ row.ci_upper }}]
+        </td>
+        <td class="mono" style="color:var(--text-muted); font-size:0.78rem;">
+          {{ row.interpretation }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Overall Verdict -->
+<div class="card">
+  <h2>🏁 Overall Biological Verdict</h2>
+  <div style="text-align:center; padding:1rem;">
+    <div style="font-size:3rem;">{{ integrity_emoji }}</div>
+    <div style="font-size:1.3rem; font-weight:600; margin-top:0.5rem;">{{ integrity_verdict }}</div>
+    <div style="font-size:0.9rem; color:var(--text-muted); margin-top:0.5rem;">Integrity Score: {{ integrity_score }}%</div>
+  </div>
 </div>
 
 <!-- Plot gallery: distributions -->
 {% if dist_plots %}
 <div class="card">
-  <h2>📊 Metric Distributions</h2>
+  <h2>📊 Distribution Across Trials</h2>
   <div class="plot-gallery">
     {% for plot in dist_plots %}
     <div class="plot-card">

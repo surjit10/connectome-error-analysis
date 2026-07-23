@@ -25,6 +25,14 @@ from modules.reporting.sensitivity_analysis import SensitivityResult
 from presentation.base_exporter import BaseExporter
 from presentation.single_rate_exporter import SingleRateExporter
 from presentation.trend_exporter import TrendExporter
+from presentation.preservation_config import (
+    calculate_preservation,
+    get_biological_status,
+    get_integrity_verdict,
+    is_preservation_metric,
+    higher_is_better,
+    KEY_INTEGRITY_METRICS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +46,10 @@ _ERROR_RATE_LABEL_MAP = {
 
 
 def _rate_label(rate: float) -> str:
-    """Convert float rate to folder-safe label (``'10'`` for 10%)."""
+    """Convert float rate to folder-safe label (e.g., '10' for 10%, '0_25' for 0.25%)."""
     if rate in _ERROR_RATE_LABEL_MAP:
         return _ERROR_RATE_LABEL_MAP[rate]
-    return f"{rate*100:.0f}"
+    return f"{rate*100:g}".replace(".", "_")
 
 
 class DatasetExporter(BaseExporter):
@@ -118,41 +126,102 @@ class DatasetExporter(BaseExporter):
     # HTML                                                                 #
     # ------------------------------------------------------------------ #
 
-    def _render_summary(self, sorted_rates: List[float]) -> None:
-        all_effects = [s.max_effect_size for s in self._sensitivity.summaries]
-        n_sensitive = sum(1 for s in self._sensitivity.summaries if s.is_sensitive)
-        max_d       = f"{max(all_effects):.4f}" if all_effects else "0.0000"
-        top_metric  = self._sensitivity.summaries[0].metric_key if self._sensitivity.summaries else "—"
-        n_metrics   = len(self._sensitivity.summaries)
-        total_trials = sum(r.n_trials for r in self._results.values())
-
-        # Per-rate summary for link list
+    def _compute_rates_info(self, sorted_rates: List[float]) -> List[Dict]:
+        """Build per-rate info with preservation data for the summary page."""
         rates_info = []
         for rate in sorted_rates:
             res    = self._results[rate]
             label  = _rate_label(rate)
-            # How many metrics are sensitive at THIS rate specifically?
             rate_metrics = self._trend.metrics_by_rate.get(rate, {})
-            n_sens_at_rate = sum(
-                1 for ev in rate_metrics.values() if abs(ev.effect_size) >= 0.8
-            )
+            n_disrupted = 0
+            for key, ev in rate_metrics.items():
+                if not is_preservation_metric(key):
+                    continue
+                pres = calculate_preservation(
+                    ev.baseline_mean, ev.mean,
+                    higher_is_better=higher_is_better(key),
+                )
+                if pres < 95.0:
+                    n_disrupted += 1
             rates_info.append({
-                "label":      label,
-                "n_trials":   res.n_trials,
-                "n_sensitive": n_sens_at_rate,
+                "label":       label,
+                "n_trials":    res.n_trials,
+                "n_disrupted": n_disrupted,
             })
+        return rates_info
 
-        sensitivity_rows = [
-            {
-                "rank":            s.rank,
-                "metric_key":      s.metric_key,
-                "max_effect_size": s.max_effect_size,
-                "effect_label":    s.effect_label,
-                "threshold_rate":  s.threshold_rate,
-                "is_sensitive":    s.is_sensitive,
-            }
-            for s in self._sensitivity.summaries[:10]  # top 10 preview
-        ]
+    def _compute_integrity(self) -> float:
+        """Compute overall network integrity from the first non-baseline rate."""
+        sorted_rates = sorted(self._results.keys())
+        # Use the first perturbed rate (skip baseline)
+        for rate in sorted_rates:
+            if rate > 0.0:
+                res = self._results[rate]
+                preservations = []
+                for a_name, m_dict in res.metrics.items():
+                    for m_name, ev in m_dict.items():
+                        key = f"{a_name}.{m_name}"
+                        if key in KEY_INTEGRITY_METRICS:
+                            pres = calculate_preservation(
+                                ev.baseline_mean, ev.mean,
+                                higher_is_better=higher_is_better(key),
+                            )
+                            preservations.append(pres)
+                if preservations:
+                    return round(sum(preservations) / len(preservations), 2)
+        return 100.0
+
+    def _render_summary(self, sorted_rates: List[float]) -> None:
+        n_metrics    = len(self._sensitivity.summaries)
+        total_trials = sum(r.n_trials for r in self._results.values())
+        rates_info   = self._compute_rates_info(sorted_rates)
+
+        # Overall integrity score
+        integrity_score = self._compute_integrity()
+        integrity_emoji, integrity_verdict, integrity_css = get_integrity_verdict(integrity_score)
+
+        # Find worst preserved metric from first perturbed rate
+        worst_preservation = 100.0
+        worst_metric = "—"
+        for rate in sorted_rates:
+            if rate > 0.0:
+                for key, ev in self._trend.metrics_by_rate.get(rate, {}).items():
+                    if not is_preservation_metric(key):
+                        continue
+                    pres = calculate_preservation(
+                        ev.baseline_mean, ev.mean,
+                        higher_is_better=higher_is_better(key),
+                    )
+                    if pres < worst_preservation:
+                        worst_preservation = pres
+                        worst_metric = key
+
+        # Preservation ranking preview (preservation metrics only)
+        from collections import defaultdict
+        metric_worst = defaultdict(lambda: 100.0)
+        for rate in sorted_rates:
+            for key, ev in self._trend.metrics_by_rate.get(rate, {}).items():
+                if not is_preservation_metric(key):
+                    continue
+                pres = calculate_preservation(
+                    ev.baseline_mean, ev.mean,
+                    higher_is_better=higher_is_better(key),
+                )
+                if pres < metric_worst[key]:
+                    metric_worst[key] = pres
+
+        # Sort by worst preservation (ascending)
+        sorted_metrics = sorted(metric_worst.items(), key=lambda x: x[1])
+        sensitivity_rows = []
+        for rank, (key, min_pres) in enumerate(sorted_metrics[:10], start=1):
+            _, bio_label, bio_css = get_biological_status(min_pres)
+            sensitivity_rows.append({
+                "rank":            rank,
+                "metric_key":      key,
+                "min_preservation": f"{min_pres:.2f}%",
+                "biological_status": bio_label,
+                "bio_css":         bio_css,
+            })
 
         root_path = self._rel_root(self.output_dir, self._root)
 
@@ -165,9 +234,12 @@ class DatasetExporter(BaseExporter):
                 "n_rates":             len(sorted_rates),
                 "total_trials":        total_trials,
                 "n_metrics":           n_metrics,
-                "n_sensitive":         n_sensitive,
-                "max_effect_size":     max_d,
-                "top_metric":          top_metric,
+                "integrity_score":     f"{integrity_score:.2f}%",
+                "integrity_emoji":     integrity_emoji,
+                "integrity_verdict":   integrity_verdict,
+                "integrity_css":       integrity_css,
+                "worst_preservation":  f"{worst_preservation:.2f}%",
+                "worst_metric":        worst_metric,
                 "rates":               rates_info,
                 "sensitivity_rows":    sensitivity_rows,
                 "root_path":           root_path,

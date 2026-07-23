@@ -122,12 +122,15 @@ class SingleRatePlotter:
                             alpha=0.8,
                         )
 
+                    from presentation.dataset_exporter import _rate_label
+                    rate_str = _rate_label(self._rate).replace("_", ".")
+                    
                     # Perturbed distribution
                     x_p = np.linspace(ev.mean - 4 * ev.std, ev.mean + 4 * ev.std, 200)
                     ax.plot(
                         x_p, norm.pdf(x_p, ev.mean, ev.std),
                         color=_ACCENT, linewidth=2,
-                        label=f"Error {self._rate*100:.0f}%",
+                        label=f"Error {rate_str}%",
                     )
                     ax.fill_between(
                         x_p, norm.pdf(x_p, ev.mean, ev.std),
@@ -192,7 +195,9 @@ class SingleRatePlotter:
 
             ax.set_xticks(x)
             ax.set_xticklabels(labels, fontsize=7, rotation=30, ha="right")
-            ax.set_title(f"Metric Spread — Error {self._rate*100:.0f}%")
+            from presentation.dataset_exporter import _rate_label
+            rate_str = _rate_label(self._rate).replace("_", ".")
+            ax.set_title(f"Metric Spread — Error {rate_str}%")
             ax.set_ylabel("Mean ± Std")
             ax.legend(fontsize=8, facecolor=_SURFACE, edgecolor=_GRID_COLOR,
                       labelcolor=_TEXT_MUTED)

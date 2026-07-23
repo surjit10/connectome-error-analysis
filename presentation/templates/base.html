@@ -148,7 +148,7 @@
     table.data-table tr:hover td { background: var(--surface2); }
     table.data-table tr:last-child td { border-bottom: none; }
 
-    /* ── Effect size badges ───────────────────────────── */
+    /* ── Preservation badges ──────────────────────────── */
     .badge {
       display:       inline-block;
       padding:       0.15rem 0.5rem;
@@ -158,10 +158,37 @@
       font-family:   var(--mono);
     }
 
-    .badge.negligible { background: #21262d; color: #8b949e; }
-    .badge.small      { background: #1c3a5e; color: #79c0ff; }
-    .badge.medium     { background: #3b2f00; color: #d29922; }
-    .badge.large      { background: #3d1a1a; color: #f85149; }
+    .badge.preserved                     { background: #0b3d1f; color: #3fb950; }
+    .badge.minor-impact                  { background: #3b2f00; color: #d29922; }
+    .badge.moderate-impact               { background: #3d2200; color: #f0883e; }
+    .badge.significant-disruption        { background: #3d1a1a; color: #f85149; }
+    .badge.structurally-preserved        { background: #0b3d1f; color: #3fb950; }
+    .badge.minor-structural-impact       { background: #3b2f00; color: #d29922; }
+    .badge.moderate-structural-disruption { background: #3d2200; color: #f0883e; }
+    .badge.significant-structural-disruption { background: #3d1a1a; color: #f85149; }
+
+    /* ── Preservation bar ────────────────────────────── */
+    .preservation-bar-container {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .preservation-bar-bg {
+      flex: 1;
+      height: 8px;
+      background: var(--surface2);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .preservation-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+    .preservation-bar-fill.green { background: #3fb950; }
+    .preservation-bar-fill.yellow { background: #d29922; }
+    .preservation-bar-fill.orange { background: #f0883e; }
+    .preservation-bar-fill.red   { background: #f85149; }
 
     /* ── Plot gallery ─────────────────────────────────── */
     .plot-gallery {

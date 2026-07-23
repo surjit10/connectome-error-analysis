@@ -39,6 +39,7 @@ from modules.reporting.trend_analysis import TrendAnalysis
 from modules.reporting.sensitivity_analysis import SensitivityAnalysis
 from presentation.error_model_exporter import ErrorModelExporter
 from presentation.root_index_exporter import RootIndexExporter
+from presentation.preservation_config import calculate_preservation, get_biological_status, get_change_interpretation, higher_is_better, is_preservation_metric, is_change_metric
 
 # ── Logging setup ─────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -165,9 +166,8 @@ def main() -> None:
     sensitivity = SensitivityAnalysis(trend).compute()
 
     logger.info(
-        "[Phase 2] Analysis complete — %d metric(s), %d sensitive (|d|≥0.8).",
+        "[Phase 2] Analysis complete — %d metric(s).",
         len(sensitivity.summaries),
-        len(sensitivity.sensitive_metrics),
     )
 
     # ── Phase 3: Export reports ───────────────────────────────────────
@@ -203,16 +203,51 @@ def main() -> None:
                 results_root, error_model_slug, dataset_name)
     logger.info("=" * 60)
 
-    # Print sensitivity summary to console
-    print("\n📊 SENSITIVITY SUMMARY")
-    print("-" * 55)
-    print(f"{'Rank':<5} {'Metric':<40} {'Max |d|':<10} {'Level'}")
-    print("-" * 55)
-    for s in sensitivity.summaries:
-        indicator = " ⚠" if s.is_sensitive else ""
-        print(f"{s.rank:<5} {s.metric_key:<40} {s.max_effect_size:<10.4f} {s.effect_label}{indicator}")
-    print("-" * 55)
-    print(f"Sensitive metrics: {len(sensitivity.sensitive_metrics)}/{len(sensitivity.summaries)}")
+    # Print preservation summary to console
+    print("\n🧬 STRUCTURAL PRESERVATION")
+    print("-" * 70)
+    print(f"{'Rank':<5} {'Metric':<40} {'Min Preservation':<17} {'Status'}")
+    print("-" * 70)
+    from collections import defaultdict
+    pres_vals = defaultdict(list)
+    for rate, res in results_by_rate.items():
+        if rate > 0.0:
+            for a_name, m_dict in res.metrics.items():
+                for m_name, ev in m_dict.items():
+                    key = f"{a_name}.{m_name}"
+                    if not is_preservation_metric(key):
+                        continue
+                    pres = calculate_preservation(ev.baseline_mean, ev.mean, higher_is_better=higher_is_better(key))
+                    pres_vals[key].append(pres)
+    
+    ranking = sorted([(k, min(v)) for k, v in pres_vals.items()], key=lambda x: x[1])
+    for rank, (key, min_pres) in enumerate(ranking, start=1):
+        _, bio_label, _ = get_biological_status(min_pres)
+        print(f"{rank:<5} {key:<40} {min_pres:<10.2f}%    {bio_label}")
+    print("-" * 70)
+    print(f"Preservation metrics: {len(ranking)}")
+    
+    # Print change summary
+    print("\n📊 STRUCTURAL CHANGE INDICATORS")
+    print("-" * 70)
+    print(f"{'Metric':<40} {'Baseline':<12} {'Perturbed':<12} {'Δ%':<10} {'Interpretation'}")
+    print("-" * 70)
+    for rate in sorted(results_by_rate.keys()):
+        if rate > 0.0:
+            res = results_by_rate[rate]
+            for a_name, m_dict in res.metrics.items():
+                for m_name, ev in m_dict.items():
+                    key = f"{a_name}.{m_name}"
+                    if not is_change_metric(key):
+                        continue
+                    baseline = ev.baseline_mean
+                    perturbed = ev.mean
+                    delta_pct = ((perturbed - baseline) / abs(baseline) * 100) if baseline != 0 else 0.0
+                    is_inc = delta_pct > 0
+                    interp = get_change_interpretation(key, delta_pct, is_inc)
+                    print(f"{key:<40} {baseline:<12.2f} {perturbed:<12.2f} {delta_pct:<+9.2f}%  {interp}")
+            break  # Show first perturbed rate only
+    print("-" * 70)
 
 
 if __name__ == "__main__":

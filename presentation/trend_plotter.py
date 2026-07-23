@@ -9,9 +9,9 @@ never computes statistics itself.
 
 Plot groups produced:
     plots/metric_trends/    — one response curve per metric (Mean ± CI vs Rate)
-    plots/global_summaries/ — all-metric effect size overlay
-    plots/heatmaps/         — effect size heatmap, CI width heatmap
-    plots/rankings/         — sensitivity ranking bar chart
+    plots/global_summaries/ — all-metric preservation overlay
+    plots/heatmaps/         — preservation heatmap, CI width heatmap
+    plots/rankings/         — preservation ranking bar chart
 
 Design constraints:
     - No statistical computation (no Cohen's d, no CI computation, no rankings).
@@ -35,6 +35,12 @@ import seaborn as sns
 
 from modules.reporting.trend_analysis import TrendAnalysisResult
 from modules.reporting.sensitivity_analysis import SensitivityResult
+from presentation.preservation_config import (
+    calculate_preservation,
+    get_biological_status,
+    higher_is_better,
+    is_preservation_metric,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +61,13 @@ _PALETTE = [
     "#bc8cff", "#79c0ff", "#56d364", "#e3b341",
 ]
 
+_THRESHOLD_COLORS = {
+    "Preserved": _ACCENT2,
+    "Minor Impact": _WARN,
+    "Moderate Impact": "#f0883e",
+    "Significant Disruption": _DANGER,
+}
+
 
 def _apply_style(ax: plt.Axes) -> None:
     ax.set_facecolor(_SURFACE)
@@ -67,6 +80,16 @@ def _apply_style(ax: plt.Axes) -> None:
     ax.grid(color=_GRID_COLOR, linewidth=0.5, linestyle="--", alpha=0.6)
     for spine in ax.spines.values():
         spine.set_edgecolor(_GRID_COLOR)
+
+def _preservation_color(preservation: float) -> str:
+    """Return a color based on preservation percentage."""
+    if preservation >= 99.0:
+        return _ACCENT2
+    elif preservation >= 95.0:
+        return _WARN
+    elif preservation >= 90.0:
+        return "#f0883e"
+    return _DANGER
 
 
 class TrendPlotter:
@@ -160,7 +183,7 @@ class TrendPlotter:
                     ax.axhline(ev0.mean, color=_ACCENT2, linestyle="--",
                                linewidth=1, label="Baseline", alpha=0.7)
 
-                ax.set_title(f"Response: {key}")
+                ax.set_title(f"Distribution Across Trials: {key}")
                 ax.set_xlabel("Error Rate (%)")
                 ax.set_ylabel("Mean Value")
                 ax.set_xticks(valid_rates)
@@ -183,14 +206,16 @@ class TrendPlotter:
     # ------------------------------------------------------------------ #
 
     def _plot_global_summaries(self) -> List[str]:
-        """Effect size vs error rate — all metrics overlaid."""
+        """Preservation vs error rate — preservation metrics only."""
         filenames: List[str] = []
         rates = self._trend.rates
         if not rates:
             return filenames
 
         all_keys = sorted(set().union(*[m.keys() for m in self._trend.metrics_by_rate.values()]))
-        if not all_keys:
+        # Filter to preservation metrics only
+        pres_keys = [k for k in all_keys if is_preservation_metric(k)]
+        if not pres_keys:
             return filenames
 
         rate_pcts = [r * 100 for r in rates]
@@ -199,23 +224,34 @@ class TrendPlotter:
             fig, ax = plt.subplots(figsize=(10, 6))
             _apply_style(ax)
 
-            for i, key in enumerate(all_keys):
-                effects = []
+            for i, key in enumerate(pres_keys):
+                preservations = []
                 for rate in rates:
                     ev = self._trend.metrics_by_rate.get(rate, {}).get(key)
-                    effects.append(ev.effect_size if (ev and math.isfinite(ev.effect_size)) else float("nan"))
+                    if ev and math.isfinite(ev.mean):
+                        pres = calculate_preservation(
+                            ev.baseline_mean, ev.mean,
+                            higher_is_better=higher_is_better(key),
+                        )
+                        preservations.append(pres)
+                    else:
+                        preservations.append(float("nan"))
 
                 color = _PALETTE[i % len(_PALETTE)]
-                ax.plot(rate_pcts, effects, color=color, marker="o",
+                ax.plot(rate_pcts, preservations, color=color, marker="o",
                         linewidth=1.5, markersize=4, label=key, alpha=0.85)
 
-            ax.axhline(0.8,  color=_DANGER, linestyle=":", linewidth=1, label="|d|=0.8 (large)", alpha=0.7)
-            ax.axhline(0.5,  color=_WARN,   linestyle=":", linewidth=1, label="|d|=0.5 (medium)", alpha=0.7)
-            ax.axhline(-0.8, color=_DANGER, linestyle=":", linewidth=1, alpha=0.7)
+            ax.axhline(99.0, color=_ACCENT2, linestyle=":", linewidth=1,
+                       label="99% Preserved", alpha=0.7)
+            ax.axhline(95.0, color=_WARN, linestyle=":", linewidth=1,
+                       label="95% Preserved", alpha=0.7)
+            ax.axhline(90.0, color=_DANGER, linestyle=":", linewidth=1,
+                       label="90% Preserved", alpha=0.7)
 
-            ax.set_title("Effect Size (Cohen's d) vs Error Rate — All Metrics")
+            ax.set_title("Biological Preservation vs Error Rate — All Metrics")
             ax.set_xlabel("Error Rate (%)")
-            ax.set_ylabel("Cohen's d")
+            ax.set_ylabel("Preservation (%)")
+            ax.set_ylim(0, 105)
             ax.set_xticks(rate_pcts)
             ax.set_xticklabels([f"{r:.0f}%" for r in rate_pcts], fontsize=8)
             ax.legend(
@@ -223,7 +259,7 @@ class TrendPlotter:
                 facecolor=_SURFACE, edgecolor=_GRID_COLOR, labelcolor=_TEXT_MUTED,
             )
 
-            fname = "effect_size_all_metrics.png"
+            fname = "preservation_all_metrics.png"
             fig.tight_layout()
             fig.savefig(self._global_dir / fname, dpi=120, bbox_inches="tight")
             plt.close(fig)
@@ -237,45 +273,56 @@ class TrendPlotter:
     # ------------------------------------------------------------------ #
 
     def _plot_heatmaps(self) -> List[str]:
-        """Effect size heatmap and CI width heatmap."""
+        """Preservation heatmap, CI width heatmap, and correlation heatmap."""
         filenames: List[str] = []
         rates = self._trend.rates
         if not rates:
             return filenames
 
         all_keys = sorted(set().union(*[m.keys() for m in self._trend.metrics_by_rate.values()]))
+        # Filter to preservation metrics only for preservation heatmap
+        pres_keys = [k for k in all_keys if is_preservation_metric(k)]
         rate_pcts = [f"{r*100:.0f}%" for r in rates]
 
-        # Build DataFrames
-        es_data: Dict[str, list] = {k: [] for k in all_keys}
+        # Build DataFrames (CI data for all metrics, preservation data only for preservation metrics)
         ci_data: Dict[str, list] = {k: [] for k in all_keys}
+        pres_data: Dict[str, list] = {k: [] for k in pres_keys}
 
         for rate in rates:
             for key in all_keys:
                 ev = self._trend.metrics_by_rate.get(rate, {}).get(key)
-                es_data[key].append(ev.effect_size if (ev and math.isfinite(ev.effect_size)) else float("nan"))
                 ci_val = (ev.ci_upper - ev.ci_lower) if (ev and math.isfinite(ev.ci_upper)) else float("nan")
                 ci_data[key].append(ci_val)
+                # Preservation data only for preservation metrics
+                if is_preservation_metric(key):
+                    if ev and math.isfinite(ev.mean):
+                        pres = calculate_preservation(
+                            ev.baseline_mean, ev.mean,
+                            higher_is_better=higher_is_better(key),
+                        )
+                        pres_data[key].append(pres)
+                    else:
+                        pres_data[key].append(float("nan"))
 
-        es_df = pd.DataFrame(es_data, index=rate_pcts).T
+        pres_df = pd.DataFrame(pres_data, index=rate_pcts).T if pres_keys else pd.DataFrame()
         ci_df = pd.DataFrame(ci_data, index=rate_pcts).T
 
         sns.set_theme(style="dark")
 
-        # Effect size heatmap
+        # Preservation heatmap
         with plt.style.context(_FIG_STYLE):
             fig, ax = plt.subplots(figsize=(max(6, len(rates) * 1.2 + 2), max(4, len(all_keys) * 0.45 + 1.5)))
             fig.patch.set_facecolor("#0d1117")
             sns.heatmap(
-                es_df, annot=True, cmap="RdBu_r", center=0, fmt=".2f",
+                pres_df, annot=True, cmap="RdYlGn", vmin=0, vmax=100, fmt=".2f",
                 ax=ax, linewidths=0.3, linecolor=_GRID_COLOR,
                 annot_kws={"size": 7},
-                cbar_kws={"shrink": 0.8},
+                cbar_kws={"shrink": 0.8, "label": "Preservation (%)"},
             )
-            ax.set_title("Effect Size (Cohen's d) Heatmap", color=_TEXT, pad=12)
+            ax.set_title("Biological Preservation Heatmap (%)", color=_TEXT, pad=12)
             ax.tick_params(colors=_TEXT_MUTED, labelsize=7)
             fig.tight_layout()
-            fname = "effect_size_heatmap.png"
+            fname = "preservation_heatmap.png"
             fig.savefig(self._heatmaps_dir / fname, dpi=120, bbox_inches="tight",
                         facecolor="#0d1117")
             plt.close(fig)
@@ -333,42 +380,69 @@ class TrendPlotter:
         return filenames
 
     # ------------------------------------------------------------------ #
-    # Sensitivity rankings                                                 #
+    # Preservation ranking                                                 #
     # ------------------------------------------------------------------ #
 
+    def _compute_preservation_ranking(self) -> List[Tuple[str, float]]:
+        """Rank preservation metrics by minimum preservation (worst first)."""
+        all_keys = sorted(set().union(*[m.keys() for m in self._trend.metrics_by_rate.values()]))
+        ranking: List[Tuple[str, float]] = []
+        for key in all_keys:
+            if not is_preservation_metric(key):
+                continue
+            preservations = []
+            for rate in self._trend.rates:
+                ev = self._trend.metrics_by_rate.get(rate, {}).get(key)
+                if ev and math.isfinite(ev.mean):
+                    pres = calculate_preservation(
+                        ev.baseline_mean, ev.mean,
+                        higher_is_better=higher_is_better(key),
+                    )
+                    preservations.append(pres)
+            if preservations:
+                ranking.append((key, min(preservations)))
+        ranking.sort(key=lambda x: x[1])
+        return ranking
+
     def _plot_rankings(self) -> List[str]:
-        """Horizontal bar chart of sensitivity ranking."""
+        """Horizontal bar chart of preservation ranking."""
         filenames: List[str] = []
-        if not self._sensitivity.summaries:
+        ranking = self._compute_preservation_ranking()
+        if not ranking:
             return filenames
 
-        summaries = self._sensitivity.summaries[:20]  # cap at 20 for readability
-        labels    = [s.metric_key for s in reversed(summaries)]
-        values    = [s.max_effect_size for s in reversed(summaries)]
-        colors    = [_DANGER if s.is_sensitive else _ACCENT for s in reversed(summaries)]
+        ranking = ranking[:20]  # cap at 20 for readability
+        labels    = [k for k, _ in reversed(ranking)]
+        values    = [v for _, v in reversed(ranking)]
+        colors    = [_preservation_color(v) for v in values]
 
         with plt.style.context(_FIG_STYLE):
             fig, ax = plt.subplots(figsize=(9, max(4, len(labels) * 0.38 + 1.5)))
             _apply_style(ax)
 
             bars = ax.barh(labels, values, color=colors, height=0.6, alpha=0.85)
-            ax.axvline(0.8, color=_DANGER, linestyle="--", linewidth=1,
-                       label="|d|=0.8 (large)")
-            ax.axvline(0.5, color=_WARN,  linestyle="--", linewidth=1,
-                       label="|d|=0.5 (medium)")
+
+            # Threshold lines
+            ax.axvline(99.0, color=_ACCENT2, linestyle="--", linewidth=1,
+                       label="99% Preserved", alpha=0.7)
+            ax.axvline(95.0, color=_WARN, linestyle="--", linewidth=1,
+                       label="95% Preserved", alpha=0.7)
+            ax.axvline(90.0, color=_DANGER, linestyle="--", linewidth=1,
+                       label="90% Preserved", alpha=0.7)
 
             # Value labels
             for bar, val in zip(bars, values):
-                ax.text(val + 0.02, bar.get_y() + bar.get_height() / 2,
-                        f"{val:.3f}", va="center", ha="left",
+                ax.text(val + 0.5, bar.get_y() + bar.get_height() / 2,
+                        f"{val:.2f}%", va="center", ha="left",
                         fontsize=7, color=_TEXT_MUTED)
 
-            ax.set_xlabel("Max |Cohen's d|")
-            ax.set_title("Metric Sensitivity Ranking (Max Effect Size)")
+            ax.set_xlim(0, 105)
+            ax.set_xlabel("Minimum Preservation (%)")
+            ax.set_title("Biological Preservation Ranking (Worst Preservation First)")
             ax.legend(fontsize=8, facecolor=_SURFACE, edgecolor=_GRID_COLOR,
                       labelcolor=_TEXT_MUTED)
 
-            fname = "sensitivity_ranking.png"
+            fname = "preservation_ranking.png"
             fig.tight_layout()
             fig.savefig(self._rankings_dir / fname, dpi=120, bbox_inches="tight")
             plt.close(fig)

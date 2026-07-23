@@ -29,31 +29,30 @@ from modules.statistical_evaluation.evaluator import (
     MetricEvaluation,
     StatisticalEvaluationResult,
 )
-from modules.reporting.sensitivity_analysis import SensitivityResult
 from presentation.base_exporter import BaseExporter
 from presentation.single_rate_plotter import SingleRatePlotter
+from presentation.preservation_config import (
+    get_metric_type,
+    calculate_preservation,
+    get_biological_status,
+    get_integrity_verdict,
+    generate_biological_assessment,
+    is_preservation_metric,
+    is_change_metric,
+    higher_is_better,
+    KEY_INTEGRITY_METRICS,
+    METRIC_DISPLAY_NAMES,
+    render_preservation_metric,
+    render_change_metric,
+    _pct_change,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def _effect_label(d: float) -> str:
-    a = abs(d)
-    if a < 0.2:
-        return "Negligible"
-    if a < 0.5:
-        return "Small"
-    if a < 0.8:
-        return "Medium"
-    return "Large"
-
-
-def _pct_change(mean: float, baseline: float) -> Tuple[str, str]:
-    """Return (formatted_pct_string, sign_char)."""
-    if baseline == 0 or not math.isfinite(baseline) or not math.isfinite(mean):
-        return "—", "="
-    delta = (mean - baseline) / abs(baseline) * 100
-    sign  = "+" if delta >= 0 else ""
-    return f"{sign}{delta:.2f}%", ("+" if delta >= 0 else "-")
+def _metric_label(key: str, default: str) -> str:
+    """Return display name from METRIC_DISPLAY_NAMES or fall back to default."""
+    return METRIC_DISPLAY_NAMES.get(key, default)
 
 
 class SingleRateExporter(BaseExporter):
@@ -89,8 +88,9 @@ class SingleRateExporter(BaseExporter):
 
     def export(self) -> None:
         """Run the full single-rate export pipeline."""
+        from presentation.dataset_exporter import _rate_label
         rate    = self._result.error_level
-        rate_pct = f"{rate*100:.0f}"
+        rate_pct = _rate_label(rate).replace("_", ".")
         logger.info("[SingleRateExporter] Exporting error_%s%%", rate_pct)
 
         self._ensure_dirs(
@@ -126,21 +126,32 @@ class SingleRateExporter(BaseExporter):
         rows = []
         for a_name, m_dict in self._result.metrics.items():
             for m_name, ev in m_dict.items():
-                rows.append({
+                key = f"{a_name}.{m_name}"
+                row = {
                     "rate": rate_pct,
                     "analysis": a_name,
                     "metric": m_name,
+                    "metric_type": get_metric_type(key),
                     "baseline_mean": ev.baseline_mean,
                     "mean": ev.mean,
                     "std": ev.std,
                     "ci_lower": ev.ci_lower,
                     "ci_upper": ev.ci_upper,
-                    "effect_size": ev.effect_size,
-                })
+                    "change_pct": _pct_change(ev.mean, ev.baseline_mean)[0],
+                }
+                if is_preservation_metric(key):
+                    pres = calculate_preservation(
+                        ev.baseline_mean, ev.mean,
+                        higher_is_better=higher_is_better(key),
+                    )
+                    row["preservation_pct"] = round(pres, 2)
+                else:
+                    row["preservation_pct"] = ""
+                rows.append(row)
         self._write_csv(
             rows,
-            ["rate", "analysis", "metric", "baseline_mean", "mean",
-             "std", "ci_lower", "ci_upper", "effect_size"],
+            ["rate", "analysis", "metric", "metric_type", "baseline_mean", "mean",
+             "std", "ci_lower", "ci_upper", "preservation_pct", "change_pct"],
             self.output_dir / "summary.csv",
         )
 
@@ -153,15 +164,27 @@ class SingleRateExporter(BaseExporter):
         for a_name, m_dict in self._result.metrics.items():
             data[a_name] = {}
             for m_name, ev in m_dict.items():
-                data[a_name][m_name] = {
+                key = f"{a_name}.{m_name}"
+                entry: dict = {
                     "baseline_mean":  ev.baseline_mean,
                     "mean":           ev.mean,
                     "std":            ev.std,
                     "ci_lower":       ev.ci_lower,
                     "ci_upper":       ev.ci_upper,
-                    "effect_size":    ev.effect_size,
-                    "effect_label":   _effect_label(ev.effect_size),
+                    "metric_type":    get_metric_type(key),
                 }
+                if is_preservation_metric(key):
+                    pres = calculate_preservation(
+                        ev.baseline_mean, ev.mean,
+                        higher_is_better=higher_is_better(key),
+                    )
+                    _, bio_label, _ = get_biological_status(pres)
+                    entry["preservation_pct"] = round(pres, 2)
+                    entry["biological_status"] = bio_label
+                else:
+                    entry["preservation_pct"] = None
+                    entry["biological_status"] = None
+                data[a_name][m_name] = entry
         self._write_json(data, self.output_dir / "data" / "metrics.json")
 
     def _write_metadata_json(self, rate_pct: str) -> None:
@@ -178,41 +201,74 @@ class SingleRateExporter(BaseExporter):
     # HTML                                                                 #
     # ------------------------------------------------------------------ #
 
+    def _compute_metric_rows(self) -> Tuple[List[Dict], List[Dict]]:
+        """Build metric table rows, separated into preservation and change lists.
+
+        Returns:
+            Tuple of ``(preservation_rows, change_rows)``.
+        """
+        pres_rows: List[Dict] = []
+        chg_rows: List[Dict] = []
+        for a_name, m_dict in self._result.metrics.items():
+            for m_name, ev in m_dict.items():
+                key = f"{a_name}.{m_name}"
+                if is_preservation_metric(key):
+                    pres_rows.append(render_preservation_metric(
+                        key, a_name, m_name,
+                        ev.baseline_mean, ev.mean,
+                        ev.std, ev.ci_lower, ev.ci_upper,
+                    ))
+                elif is_change_metric(key):
+                    chg_rows.append(render_change_metric(
+                        key, a_name, m_name,
+                        ev.baseline_mean, ev.mean,
+                        ev.std, ev.ci_lower, ev.ci_upper,
+                    ))
+        return pres_rows, chg_rows
+
+    def _compute_integrity(self, preservation_rows: List[Dict]) -> Tuple[float, List[Dict]]:
+        """Compute overall network integrity score from key preservation metrics.
+
+        Returns:
+            Tuple of ``(integrity_score, key_metric_rows)``.
+        """
+        key_rows = [
+            r for r in preservation_rows
+            if f"{r['analysis']}.{r['metric']}" in KEY_INTEGRITY_METRICS
+        ]
+        if not key_rows:
+            return 100.0, []
+        integrity = sum(r["preservation_num"] for r in key_rows) / len(key_rows)
+        return round(integrity, 2), key_rows
+
     def _render_report(
         self,
         rate_pct:     str,
         dist_files:   List[str],
         struct_files: List[str],
     ) -> None:
-        metrics = self._result.metrics
         rate    = self._result.error_level
 
-        # Build metrics table rows
-        metric_rows = []
-        for a_name, m_dict in metrics.items():
-            for m_name, ev in m_dict.items():
-                delta_pct, delta_sign = _pct_change(ev.mean, ev.baseline_mean)
-                metric_rows.append({
-                    "analysis":    a_name,
-                    "metric":      m_name,
-                    "baseline_mean": f"{ev.baseline_mean:.6g}",
-                    "mean":          f"{ev.mean:.6g}",
-                    "std":           f"{ev.std:.6g}",
-                    "ci_lower":      f"{ev.ci_lower:.6g}",
-                    "ci_upper":      f"{ev.ci_upper:.6g}",
-                    "effect_size":   f"{ev.effect_size:.4f}",
-                    "effect_label":  _effect_label(ev.effect_size),
-                    "delta_pct":     delta_pct,
-                    "delta_sign":    delta_sign,
-                })
+        # Build metric rows (separated by type)
+        preservation_rows, change_rows = self._compute_metric_rows()
 
-        all_effects = [abs(ev.effect_size) for m_d in metrics.values() for ev in m_d.values()]
-        n_sensitive = sum(1 for e in all_effects if e >= 0.8)
-        max_d       = f"{max(all_effects):.4f}" if all_effects else "0.0000"
-        top_key     = metric_rows[
-            all_effects.index(max(all_effects))
-        ]["metric"] if all_effects else "—"
-        avg_d = f"{sum(all_effects)/len(all_effects):.4f}" if all_effects else "0.0000"
+        # Compute overall integrity (only from preservation metrics)
+        integrity_score, key_metric_rows = self._compute_integrity(preservation_rows)
+        integrity_emoji, integrity_verdict, integrity_css = get_integrity_verdict(integrity_score)
+
+        # Collect per-metric preservation dict for assessment text
+        preservation_dict: Dict[str, float] = {}
+        for r in preservation_rows:
+            key = f"{r['analysis']}.{r['metric']}"
+            preservation_dict[key] = r["preservation_num"]
+
+        assessment = generate_biological_assessment(integrity_score, preservation_dict)
+
+        n_preservation = len(preservation_rows)
+        n_change = len(change_rows)
+        n_metrics = n_preservation + n_change
+
+        from presentation.dataset_exporter import _rate_label
 
         # Prev / next navigation
         idx       = self._all_rates.index(rate) if rate in self._all_rates else -1
@@ -220,32 +276,36 @@ class SingleRateExporter(BaseExporter):
         next_url  = None
         if idx > 0:
             prev_rate = self._all_rates[idx - 1]
-            prev_url  = f"../error_{prev_rate*100:.0f}/report.html"
+            prev_url  = f"../error_{_rate_label(prev_rate)}/report.html"
         if idx < len(self._all_rates) - 1:
             next_rate = self._all_rates[idx + 1]
-            next_url  = f"../error_{next_rate*100:.0f}/report.html"
+            next_url  = f"../error_{_rate_label(next_rate)}/report.html"
 
         root_path = self._rel_root(self.output_dir, self._root)
 
         self._render_template(
             "single_rate_report.html",
             {
-                "dataset_name":      self._dataset,
-                "error_model_slug":  self._em_slug,
+                "dataset_name":        self._dataset,
+                "error_model_slug":    self._em_slug,
                 "error_model_display": self._em_display,
-                "error_rate_pct":    rate_pct,
-                "n_trials":          self._result.n_trials,
-                "n_metrics":         len(metric_rows),
-                "n_sensitive":       n_sensitive,
-                "max_effect_size":   max_d,
-                "avg_effect_size":   avg_d,
-                "top_metric":        top_key,
-                "metric_rows":       metric_rows,
-                "dist_plots":        [{"filename": f, "label": f.replace(".png","").replace("distribution_","")} for f in dist_files],
-                "struct_plots":      [{"filename": f, "label": f.replace(".png","")} for f in struct_files],
-                "prev_rate_url":     prev_url,
-                "next_rate_url":     next_url,
-                "root_path":         root_path,
+                "error_rate_pct":      rate_pct,
+                "n_trials":            self._result.n_trials,
+                "n_metrics":           n_metrics,
+                "preservation_rows":   preservation_rows,
+                "change_rows":         change_rows,
+                "has_preservation":    n_preservation > 0,
+                "has_change":          n_change > 0,
+                "integrity_score":     f"{integrity_score:.2f}",
+                "integrity_emoji":     integrity_emoji,
+                "integrity_verdict":   integrity_verdict,
+                "integrity_css":       integrity_css,
+                "biological_assessment": assessment,
+                "dist_plots":          [{"filename": f, "label": f.replace(".png","").replace("distribution_","")} for f in dist_files],
+                "struct_plots":        [{"filename": f, "label": f.replace(".png","")} for f in struct_files],
+                "prev_rate_url":       prev_url,
+                "next_rate_url":       next_url,
+                "root_path":           root_path,
             },
             self.output_dir / "report.html",
         )

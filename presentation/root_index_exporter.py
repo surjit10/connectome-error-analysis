@@ -93,7 +93,7 @@ class RootIndexExporter(BaseExporter):
         for item in sorted(self._root.iterdir()):
             if not item.is_dir():
                 continue
-            if item.name in ("comparison", ".git", "__pycache__"):
+            if item.name in ("comparison", ".git", "__pycache__") or item.name.endswith("_percent"):
                 continue
 
             slug = item.name
@@ -120,9 +120,15 @@ class RootIndexExporter(BaseExporter):
                 # Best-effort trial count from first rate dir
                 n_trials = 0
                 if rate_dirs:
-                    sc = rate_dirs[0] / "summary.csv"
-                    if sc.exists():
-                        n_trials = 1  # placeholder — actual count in the CSV
+                    meta_path = rate_dirs[0] / "data" / "metadata.json"
+                    if meta_path.exists():
+                        try:
+                            import json
+                            with open(meta_path, "r", encoding="utf-8") as f:
+                                meta_data = json.load(f)
+                                n_trials = meta_data.get("n_trials", 1)
+                        except Exception:
+                            n_trials = 1
 
                 datasets.append({
                     "name":     ds_dir.name,

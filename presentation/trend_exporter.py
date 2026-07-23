@@ -21,24 +21,24 @@ Design constraints:
 from __future__ import annotations
 
 import logging
+import math
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from modules.statistical_evaluation.evaluator import StatisticalEvaluationResult
 from modules.reporting.trend_analysis import TrendAnalysisResult
 from modules.reporting.sensitivity_analysis import SensitivityResult
 from presentation.base_exporter import BaseExporter
 from presentation.trend_plotter import TrendPlotter
+from presentation.preservation_config import (
+    calculate_preservation,
+    get_biological_status,
+    is_preservation_metric,
+    higher_is_better,
+    KEY_INTEGRITY_METRICS,
+)
 
 logger = logging.getLogger(__name__)
-
-
-def _effect_label(d: float) -> str:
-    a = abs(d)
-    if a < 0.2:  return "Negligible"
-    if a < 0.5:  return "Small"
-    if a < 0.8:  return "Medium"
-    return "Large"
 
 
 class TrendExporter(BaseExporter):
@@ -98,6 +98,22 @@ class TrendExporter(BaseExporter):
         self._render_trend_report(plot_groups)
 
     # ------------------------------------------------------------------ #
+    # Preservation helpers                                                 #
+    # ------------------------------------------------------------------ #
+
+    def _preservation_for_rate(self, rate: float, key: str) -> float:
+        """Compute preservation for one metric at one error rate."""
+        if not is_preservation_metric(key):
+            return 100.0
+        ev = self._trend.metrics_by_rate.get(rate, {}).get(key)
+        if ev is None:
+            return 100.0
+        return calculate_preservation(
+            ev.baseline_mean, ev.mean,
+            higher_is_better=higher_is_better(key),
+        )
+
+    # ------------------------------------------------------------------ #
     # CSVs                                                                 #
     # ------------------------------------------------------------------ #
 
@@ -107,6 +123,8 @@ class TrendExporter(BaseExporter):
         for rate in self._trend.rates:
             for key, ev in self._trend.metrics_by_rate.get(rate, {}).items():
                 a_name, _, m_name = key.partition(".")
+                preservation = self._preservation_for_rate(rate, key)
+                _, bio_label, _ = get_biological_status(preservation)
                 rows.append({
                     "rate":           rate,
                     "rate_pct":       f"{rate*100:.0f}%",
@@ -117,32 +135,33 @@ class TrendExporter(BaseExporter):
                     "std":            ev.std,
                     "ci_lower":       ev.ci_lower,
                     "ci_upper":       ev.ci_upper,
-                    "effect_size":    ev.effect_size,
-                    "effect_label":   _effect_label(ev.effect_size),
+                    "preservation_pct": round(preservation, 2),
+                    "biological_status": bio_label,
                 })
         self._write_csv(
             rows,
             ["rate", "rate_pct", "analysis", "metric", "baseline_mean",
-             "mean", "std", "ci_lower", "ci_upper", "effect_size", "effect_label"],
+             "mean", "std", "ci_lower", "ci_upper", "preservation_pct",
+             "biological_status"],
             self.output_dir / "combined_results.csv",
         )
 
     def _write_combined_statistics(self) -> None:
-        """Write combined_statistics.csv — sensitivity ranking with threshold info."""
+        """Write combined_statistics.csv — preservation ranking."""
+        # Rank metrics by worst (minimum) preservation across all rates
         rows = []
-        for s in self._sensitivity.summaries:
+        ranking = self._compute_preservation_ranking()
+        for rank, (key, min_preservation) in enumerate(ranking, start=1):
+            _, bio_label, _ = get_biological_status(min_preservation)
             rows.append({
-                "rank":            s.rank,
-                "metric":          s.metric_key,
-                "max_effect_size": s.max_effect_size,
-                "effect_label":    s.effect_label,
-                "threshold_rate":  s.threshold_rate if s.threshold_rate is not None else "",
-                "is_sensitive":    s.is_sensitive,
+                "rank":              rank,
+                "metric":            key,
+                "min_preservation":  round(min_preservation, 2),
+                "biological_status": bio_label,
             })
         self._write_csv(
             rows,
-            ["rank", "metric", "max_effect_size", "effect_label",
-             "threshold_rate", "is_sensitive"],
+            ["rank", "metric", "min_preservation", "biological_status"],
             self.output_dir / "combined_statistics.csv",
         )
 
@@ -150,37 +169,64 @@ class TrendExporter(BaseExporter):
     # HTML                                                                 #
     # ------------------------------------------------------------------ #
 
+    def _compute_preservation_ranking(self) -> List[Tuple[str, float]]:
+        """Rank preservation metrics by minimum preservation (worst first).
+
+        Only includes metrics classified as 'preservation' type.
+        """
+        all_keys = set()
+        for m_dict in self._trend.metrics_by_rate.values():
+            all_keys.update(m_dict.keys())
+
+        ranking: List[Tuple[str, float]] = []
+        for key in sorted(all_keys):
+            if not is_preservation_metric(key):
+                continue
+            preservations = []
+            for rate in self._trend.rates:
+                ev = self._trend.metrics_by_rate.get(rate, {}).get(key)
+                if ev is not None:
+                    pres = calculate_preservation(
+                        ev.baseline_mean, ev.mean,
+                        higher_is_better=higher_is_better(key),
+                    )
+                    preservations.append(pres)
+            if preservations:
+                ranking.append((key, min(preservations)))
+        ranking.sort(key=lambda x: x[1])
+        return ranking
+
     def _render_trend_report(self, plot_groups: Dict[str, List[str]]) -> None:
         rates     = self._trend.rates
         rate_pcts = [f"{r*100:.0f}" for r in rates]
 
-        all_effects = [s.max_effect_size for s in self._sensitivity.summaries]
-        n_sensitive = sum(1 for s in self._sensitivity.summaries if s.is_sensitive)
-        max_d       = f"{max(all_effects):.4f}" if all_effects else "0.0000"
-        top_metric  = self._sensitivity.summaries[0].metric_key if self._sensitivity.summaries else "—"
+        ranking = self._compute_preservation_ranking()
+        all_preservations = [p for _, p in ranking]
+        min_preservation = f"{min(all_preservations):.2f}%" if all_preservations else "100.00%"
+        avg_preservation = f"{sum(all_preservations)/len(all_preservations):.2f}%" if all_preservations else "100.00%"
+        worst_metric = ranking[0][0] if ranking else "—"
 
-        # Effect table rows (metric × rate)
-        all_keys = [s.metric_key for s in self._sensitivity.summaries]
-        effect_table_rows = []
+        # Preservation table rows (metric × rate)
+        all_keys = [k for k, _ in ranking]
+        preservation_table_rows = []
         for key in all_keys:
             cells = []
             for rate in rates:
-                ev = self._trend.metrics_by_rate.get(rate, {}).get(key)
-                val  = f"{ev.effect_size:.3f}" if ev else "—"
-                lab  = _effect_label(ev.effect_size) if ev else "Negligible"
-                cells.append({"value": val, "label": lab})
-            effect_table_rows.append({"metric": key, "cells": cells})
+                pres = self._preservation_for_rate(rate, key)
+                _, bio_label, _ = get_biological_status(pres)
+                cells.append({"value": f"{pres:.2f}%", "label": bio_label})
+            preservation_table_rows.append({"metric": key, "cells": cells})
 
-        # Sensitivity table rows
+        # Preservation ranking table rows
         sensitivity_rows = []
-        for s in self._sensitivity.summaries:
+        for rank, (key, min_pres) in enumerate(ranking, start=1):
+            _, bio_label, bio_css = get_biological_status(min_pres)
             sensitivity_rows.append({
-                "rank":            s.rank,
-                "metric_key":      s.metric_key,
-                "max_effect_size": s.max_effect_size,
-                "effect_label":    s.effect_label,
-                "threshold_rate":  s.threshold_rate,
-                "is_sensitive":    s.is_sensitive,
+                "rank":            rank,
+                "metric_key":      key,
+                "min_preservation": f"{min_pres:.2f}%",
+                "biological_status": bio_label,
+                "bio_css":         bio_css,
             })
 
         # Plot lists
@@ -199,11 +245,11 @@ class TrendExporter(BaseExporter):
                 "error_model_display": self._em_display,
                 "rates":               [f"{r*100:.0f}" for r in rates],
                 "n_metrics":           len(all_keys),
-                "n_sensitive":         n_sensitive,
-                "max_effect_size":     max_d,
-                "top_metric":          top_metric,
+                "min_preservation":    min_preservation,
+                "avg_preservation":    avg_preservation,
+                "worst_metric":        worst_metric,
                 "sensitivity_rows":    sensitivity_rows,
-                "effect_table_rows":   effect_table_rows,
+                "preservation_table_rows": preservation_table_rows,
                 "heatmap_plots":       _to_plot_list(plot_groups.get("heatmaps", [])),
                 "global_summary_plots": _to_plot_list(plot_groups.get("global_summaries", [])),
                 "ranking_plots":       _to_plot_list(plot_groups.get("rankings", [])),
