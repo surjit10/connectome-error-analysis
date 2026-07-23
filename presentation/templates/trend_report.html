@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Trend Analysis — {{ dataset_name }} — {{ error_model_display }}{% endblock %}
+
+{% block breadcrumb %}
+<a href="{{ root_path }}index.html">Index</a>
+<span class="sep">/</span>
+<a href="{{ root_path }}{{ error_model_slug }}/overview.html">{{ error_model_display }}</a>
+<span class="sep">/</span>
+<a href="../summary.html">{{ dataset_name }}</a>
+<span class="sep">/</span>
+<span>Trend Analysis</span>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Trend Analysis — {{ dataset_name }}</h1>
+  <p class="subtitle">
+    {{ error_model_display }} &middot;
+    {{ rates | length }} error rate(s): {{ rates | join("%, ") }}% &middot;
+    {{ n_metrics }} metric(s)
+  </p>
+</div>
+
+<!-- Top stats -->
+<div class="grid-3 mb-2">
+  <div class="stat-box">
+    <div class="stat-value">{{ n_sensitive }}</div>
+    <div class="stat-label">Sensitive Metrics (|d|≥0.8)</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-value mono">{{ max_effect_size }}</div>
+    <div class="stat-label">Peak Effect Size</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-value mono">{{ top_metric }}</div>
+    <div class="stat-label">Most Sensitive Metric</div>
+  </div>
+</div>
+
+<!-- Sensitivity ranking -->
+<div class="card">
+  <h2>🏆 Sensitivity Ranking</h2>
+  <p class="text-muted mt-1" style="font-size:0.82rem;margin-bottom:0.75rem;">
+    Ranked by maximum |Cohen's d| across all error rates.
+    Large effect = |d| ≥ 0.8. Threshold rate = first rate where |d| crosses 0.8.
+  </p>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Metric</th>
+        <th>Max |d|</th>
+        <th>Level</th>
+        <th>Threshold Rate</th>
+        <th>Sensitive?</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in sensitivity_rows %}
+      <tr>
+        <td class="mono">{{ row.rank }}</td>
+        <td class="mono">{{ row.metric_key }}</td>
+        <td class="mono">{{ "%.3f" | format(row.max_effect_size) }}</td>
+        <td><span class="badge {{ row.effect_label | lower }}">{{ row.effect_label }}</span></td>
+        <td class="mono">
+          {% if row.threshold_rate is not none %}
+            {{ "%.0f" | format(row.threshold_rate * 100) }}%
+          {% else %}
+            —
+          {% endif %}
+        </td>
+        <td>
+          {% if row.is_sensitive %}<span class="badge large">Yes</span>
+          {% else %}<span class="badge negligible">No</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Effect size heatmap -->
+{% if heatmap_plots %}
+<div class="card">
+  <h2>🔥 Effect Size Heatmaps</h2>
+  <div class="plot-gallery">
+    {% for plot in heatmap_plots %}
+    <div class="plot-card">
+      <a href="plots/heatmaps/{{ plot.filename }}" target="_blank">
+        <img src="plots/heatmaps/{{ plot.filename }}" alt="{{ plot.label }}" loading="lazy"/>
+      </a>
+      <div class="plot-label">{{ plot.label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Global summary plots -->
+{% if global_summary_plots %}
+<div class="card">
+  <h2>📈 Global Summaries</h2>
+  <div class="plot-gallery">
+    {% for plot in global_summary_plots %}
+    <div class="plot-card">
+      <a href="plots/global_summaries/{{ plot.filename }}" target="_blank">
+        <img src="plots/global_summaries/{{ plot.filename }}" alt="{{ plot.label }}" loading="lazy"/>
+      </a>
+      <div class="plot-label">{{ plot.label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Ranking plots -->
+{% if ranking_plots %}
+<div class="card">
+  <h2>📊 Rankings &amp; Sensitivity</h2>
+  <div class="plot-gallery">
+    {% for plot in ranking_plots %}
+    <div class="plot-card">
+      <a href="plots/rankings/{{ plot.filename }}" target="_blank">
+        <img src="plots/rankings/{{ plot.filename }}" alt="{{ plot.label }}" loading="lazy"/>
+      </a>
+      <div class="plot-label">{{ plot.label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Per-metric trend plots -->
+{% if metric_trend_plots %}
+<div class="card">
+  <h2>📉 Per-Metric Response Curves</h2>
+  <div class="plot-gallery">
+    {% for plot in metric_trend_plots %}
+    <div class="plot-card">
+      <a href="plots/metric_trends/{{ plot.filename }}" target="_blank">
+        <img src="plots/metric_trends/{{ plot.filename }}" alt="{{ plot.label }}" loading="lazy"/>
+      </a>
+      <div class="plot-label">{{ plot.label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Effect size table across rates -->
+<div class="card">
+  <h2>📋 Effect Sizes Across All Rates</h2>
+  <div style="overflow-x:auto">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        {% for r in rates %}
+        <th>{{ r }}%</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in effect_table_rows %}
+      <tr>
+        <td class="mono">{{ row.metric }}</td>
+        {% for cell in row.cells %}
+        <td class="mono">
+          <span class="badge {{ cell.label | lower }}">{{ cell.value }}</span>
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- Navigation -->
+<div class="card">
+  <h2>🔗 Navigation</h2>
+  <ul class="link-list">
+    <li><a href="../summary.html"><span>📑</span><span>Dataset Summary</span></a></li>
+    <li><a href="combined_results.csv"><span>📄</span><span>combined_results.csv</span></a></li>
+    <li><a href="combined_statistics.csv"><span>📄</span><span>combined_statistics.csv</span></a></li>
+  </ul>
+</div>
+{% endblock %}

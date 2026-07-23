@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}{{ dataset_name }} — {{ error_model_display }} Summary{% endblock %}
+
+{% block breadcrumb %}
+<a href="{{ root_path }}index.html">Index</a>
+<span class="sep">/</span>
+<a href="{{ root_path }}{{ error_model_slug }}/overview.html">{{ error_model_display }}</a>
+<span class="sep">/</span>
+<span>{{ dataset_name }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>{{ dataset_name }} — {{ error_model_display }}</h1>
+  <p class="subtitle">
+    {{ n_rates }} error rate(s) &middot; {{ total_trials }} trial(s) &middot;
+    {{ n_metrics }} metric(s) evaluated
+  </p>
+</div>
+
+<!-- Stat row -->
+<div class="grid-3 mb-2">
+  <div class="stat-box">
+    <div class="stat-value">{{ n_sensitive }}</div>
+    <div class="stat-label">Sensitive Metrics (|d|≥0.8)</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-value mono">{{ max_effect_size }}</div>
+    <div class="stat-label">Max Effect Size</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-value mono">{{ top_metric }}</div>
+    <div class="stat-label">Most Sensitive Metric</div>
+  </div>
+</div>
+
+<!-- Error rate navigation -->
+<div class="card">
+  <h2>📂 Experiments by Error Rate</h2>
+  <ul class="link-list">
+    {% for rate in rates %}
+    <li>
+      <a href="error_{{ rate.label }}/report.html">
+        <span>🔬</span>
+        <span>Error {{ rate.label }}%</span>
+        <span class="tag">{{ rate.n_trials }} trial(s)</span>
+        {% if rate.n_sensitive > 0 %}
+        <span class="badge large">{{ rate.n_sensitive }} sensitive</span>
+        {% endif %}
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+
+<!-- Trend analysis -->
+<div class="card">
+  <h2>📈 Trend Analysis</h2>
+  <p class="text-muted mt-1" style="font-size:0.85rem;margin-bottom:0.75rem;">
+    Aggregated results across all error rates including effect size progression,
+    metric response curves, sensitivity ranking, and correlation matrices.
+  </p>
+  <ul class="link-list">
+    <li><a href="trend_analysis/trend_report.html">
+      <span>📈</span><span>Open Trend Report</span>
+    </a></li>
+  </ul>
+</div>
+
+<!-- Sensitivity ranking preview -->
+{% if sensitivity_rows %}
+<div class="card">
+  <h2>📊 Sensitivity Ranking (Preview)</h2>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Metric</th>
+        <th>Max |d|</th>
+        <th>Level</th>
+        <th>Threshold Rate</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in sensitivity_rows %}
+      <tr>
+        <td class="mono">{{ row.rank }}</td>
+        <td class="mono">{{ row.metric_key }}</td>
+        <td class="mono">{{ "%.3f" | format(row.max_effect_size) }}</td>
+        <td><span class="badge {{ row.effect_label | lower }}">{{ row.effect_label }}</span></td>
+        <td class="mono">
+          {% if row.threshold_rate is not none %}
+            {{ "%.0f" | format(row.threshold_rate * 100) }}%
+          {% else %}
+            —
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

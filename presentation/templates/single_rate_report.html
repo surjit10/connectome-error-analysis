@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Error {{ error_rate_pct }}% — {{ dataset_name }} Report{% endblock %}
+
+{% block breadcrumb %}
+<a href="{{ root_path }}index.html">Index</a>
+<span class="sep">/</span>
+<a href="{{ root_path }}{{ error_model_slug }}/overview.html">{{ error_model_display }}</a>
+<span class="sep">/</span>
+<a href="../summary.html">{{ dataset_name }}</a>
+<span class="sep">/</span>
+<span>Error {{ error_rate_pct }}%</span>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Error Rate {{ error_rate_pct }}% — {{ dataset_name }}</h1>
+  <p class="subtitle">
+    {{ error_model_display }} &middot; {{ n_trials }} trial(s) &middot;
+    {{ n_metrics }} metric(s) &middot; Baseline: 0%
+  </p>
+</div>
+
+<!-- Metadata sidebar + summary stats -->
+<div class="grid-2 mb-2">
+  <div class="card" style="margin-bottom:0">
+    <h2>🧪 Experiment Info</h2>
+    <table class="data-table">
+      <tbody>
+        <tr><td class="text-muted">Dataset</td><td class="mono">{{ dataset_name }}</td></tr>
+        <tr><td class="text-muted">Error Model</td><td class="mono">{{ error_model_display }}</td></tr>
+        <tr><td class="text-muted">Error Rate</td><td class="mono">{{ error_rate_pct }}%</td></tr>
+        <tr><td class="text-muted">Trials</td><td class="mono">{{ n_trials }}</td></tr>
+        <tr><td class="text-muted">Metrics</td><td class="mono">{{ n_metrics }}</td></tr>
+        <tr><td class="text-muted">Generated</td><td class="mono">{{ generated_at }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card" style="margin-bottom:0">
+    <h2>📈 Quick Stats</h2>
+    <table class="data-table">
+      <tbody>
+        <tr><td class="text-muted">Sensitive Metrics (|d|≥0.8)</td><td class="mono">{{ n_sensitive }}</td></tr>
+        <tr><td class="text-muted">Max Effect Size |d|</td><td class="mono">{{ max_effect_size }}</td></tr>
+        <tr><td class="text-muted">Most Sensitive</td><td class="mono">{{ top_metric }}</td></tr>
+        <tr><td class="text-muted">Avg Effect Size</td><td class="mono">{{ avg_effect_size }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Metrics table -->
+<div class="card">
+  <h2>📊 Metric Results</h2>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Analysis</th>
+        <th>Metric</th>
+        <th>Baseline Mean</th>
+        <th>Perturbed Mean</th>
+        <th>Δ%</th>
+        <th>Std</th>
+        <th>95% CI</th>
+        <th>Cohen's d</th>
+        <th>Level</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in metric_rows %}
+      <tr>
+        <td class="mono text-muted">{{ row.analysis }}</td>
+        <td class="mono">{{ row.metric }}</td>
+        <td class="mono">{{ row.baseline_mean }}</td>
+        <td class="mono">{{ row.mean }}</td>
+        <td class="mono {% if row.delta_sign == '+' %}positive{% else %}negative{% endif %}">
+          {{ row.delta_pct }}
+        </td>
+        <td class="mono">{{ row.std }}</td>
+        <td class="mono">
+          [{{ row.ci_lower }}, {{ row.ci_upper }}]
+        </td>
+        <td class="mono">{{ row.effect_size }}</td>
+        <td><span class="badge {{ row.effect_label | lower }}">{{ row.effect_label }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Plot gallery: distributions -->
+{% if dist_plots %}
+<div class="card">
+  <h2>📉 Metric Distributions</h2>
+  <div class="plot-gallery">
+    {% for plot in dist_plots %}
+    <div class="plot-card">
+      <a href="plots/distributions/{{ plot.filename }}" target="_blank">
+        <img src="plots/distributions/{{ plot.filename }}" alt="{{ plot.label }}" loading="lazy"/>
+      </a>
+      <div class="plot-label">{{ plot.label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Plot gallery: structure -->
+{% if struct_plots %}
+<div class="card">
+  <h2>🔗 Structure Plots</h2>
+  <div class="plot-gallery">
+    {% for plot in struct_plots %}
+    <div class="plot-card">
+      <a href="plots/structure/{{ plot.filename }}" target="_blank">
+        <img src="plots/structure/{{ plot.filename }}" alt="{{ plot.label }}" loading="lazy"/>
+      </a>
+      <div class="plot-label">{{ plot.label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Navigation -->
+<div class="card">
+  <h2>🔗 Navigation</h2>
+  <ul class="link-list">
+    {% if prev_rate_url %}
+    <li><a href="{{ prev_rate_url }}"><span>←</span><span>Previous Rate</span></a></li>
+    {% endif %}
+    {% if next_rate_url %}
+    <li><a href="{{ next_rate_url }}"><span>→</span><span>Next Rate</span></a></li>
+    {% endif %}
+    <li><a href="../trend_analysis/trend_report.html"><span>📈</span><span>Trend Analysis</span></a></li>
+    <li><a href="../summary.html"><span>📑</span><span>Dataset Summary</span></a></li>
+    <li><a href="data/metrics.json"><span>📄</span><span>metrics.json (raw data)</span></a></li>
+  </ul>
+</div>
+{% endblock %}

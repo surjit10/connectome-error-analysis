@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}{{ error_model_display }} — Overview{% endblock %}
+
+{% block breadcrumb %}
+<a href="{{ root_path }}index.html">Index</a>
+<span class="sep">/</span>
+<span>{{ error_model_display }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>{{ error_model_display }}</h1>
+  <p class="subtitle">{{ description }}</p>
+</div>
+
+<div class="grid-3 mb-2">
+  <div class="stat-box">
+    <div class="stat-value">{{ datasets | length }}</div>
+    <div class="stat-label">Datasets</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-value">{{ total_rates }}</div>
+    <div class="stat-label">Error Rates</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-value">{{ total_trials }}</div>
+    <div class="stat-label">Total Trials</div>
+  </div>
+</div>
+
+{% for ds in datasets %}
+<div class="card">
+  <h2>📂 {{ ds.name }}</h2>
+  <ul class="link-list">
+    <li><a href="{{ ds.name }}/summary.html">
+      <span>📑</span><span>Dataset Summary</span>
+      <span class="tag">{{ ds.n_rates }} error rate(s)</span>
+    </a></li>
+    <li><a href="{{ ds.name }}/trend_analysis/trend_report.html">
+      <span>📈</span><span>Trend Analysis</span>
+    </a></li>
+    {% for rate in ds.rates %}
+    <li><a href="{{ ds.name }}/error_{{ rate.label }}/report.html">
+      <span>🔬</span>
+      <span>Error {{ rate.label }}%</span>
+      <span class="tag">{{ rate.n_trials }} trial(s)</span>
+    </a></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endfor %}
+
+<div class="card">
+  <h2>🔬 Cross-Dataset Analysis</h2>
+  <p class="text-muted mt-1" style="font-size:0.85rem">
+    Cross-dataset comparisons will appear here once multiple datasets are processed.
+  </p>
+</div>
+{% endblock %}

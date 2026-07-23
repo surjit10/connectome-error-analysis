@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}FlyWire Analysis — Experiment Index{% endblock %}
+
+{% block breadcrumb %}
+<span>Experiment Index</span>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>FlyWire Connectome Error Analysis</h1>
+  <p class="subtitle">
+    Root index of all biological error model experiments across datasets.
+    Navigate to an error model to explore per-dataset and per-rate results.
+  </p>
+</div>
+
+<!-- Summary stats -->
+<div class="grid-3 mb-2">
+  <div class="stat-box">
+    <div class="stat-value">{{ error_models | length }}</div>
+    <div class="stat-label">Error Models</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-value">{{ total_datasets }}</div>
+    <div class="stat-label">Datasets Covered</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-value">{{ total_experiments }}</div>
+    <div class="stat-label">Experiments Run</div>
+  </div>
+</div>
+
+<!-- Error model cards -->
+{% for model in error_models %}
+<div class="card">
+  <h2>{{ model.display_name }}</h2>
+  <p class="text-muted mt-1" style="font-size:0.85rem; margin-bottom:0.75rem;">
+    {{ model.description }}
+  </p>
+  <ul class="link-list">
+    {% for dataset in model.datasets %}
+    <li>
+      <a href="{{ model.slug }}/{{ dataset.name }}/summary.html">
+        <span>📂</span>
+        <span>{{ dataset.name }}</span>
+        <span class="tag">{{ dataset.n_rates }} rate(s)</span>
+        <span class="tag">{{ dataset.n_trials }} trials</span>
+      </a>
+    </li>
+    {% endfor %}
+    <li>
+      <a href="{{ model.slug }}/overview.html">
+        <span>🗂</span>
+        <span>Overview — {{ model.display_name }}</span>
+        <span class="tag">overview</span>
+      </a>
+    </li>
+  </ul>
+</div>
+{% else %}
+<div class="card">
+  <p class="text-muted">No error models have been generated yet.</p>
+</div>
+{% endfor %}
+
+{% if show_comparison %}
+<div class="card">
+  <h2>🔬 Cross-Dataset &amp; Cross-Model Comparisons</h2>
+  <ul class="link-list">
+    <li><a href="comparison/datasets/index.html"><span>📊</span><span>Dataset Comparisons</span></a></li>
+    <li><a href="comparison/error_models/index.html"><span>📊</span><span>Error Model Comparisons</span></a></li>
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

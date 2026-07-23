@@ -32,3 +32,4 @@ pytest_output.txt
 
 results/
 flywire_codebase/
+*_results/
