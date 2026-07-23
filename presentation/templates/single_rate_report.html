@@ -24,7 +24,7 @@
 <!-- Metadata sidebar + summary stats -->
 <div class="grid-2 mb-2">
   <div class="card" style="margin-bottom:0">
-    <h2>🧪 Experiment Info</h2>
+    <h2>ℹ️ Experiment Info</h2>
     <table class="data-table">
       <tbody>
         <tr><td class="text-muted">Dataset</td><td class="mono">{{ dataset_name }}</td></tr>
@@ -37,7 +37,7 @@
     </table>
   </div>
   <div class="card" style="margin-bottom:0">
-    <h2>📈 Quick Stats</h2>
+    <h2>📊 Quick Stats</h2>
     <table class="data-table">
       <tbody>
         <tr><td class="text-muted">Sensitive Metrics (|d|≥0.8)</td><td class="mono">{{ n_sensitive }}</td></tr>
@@ -91,7 +91,7 @@
 <!-- Plot gallery: distributions -->
 {% if dist_plots %}
 <div class="card">
-  <h2>📉 Metric Distributions</h2>
+  <h2>📊 Metric Distributions</h2>
   <div class="plot-gallery">
     {% for plot in dist_plots %}
     <div class="plot-card">
@@ -108,7 +108,7 @@
 <!-- Plot gallery: structure -->
 {% if struct_plots %}
 <div class="card">
-  <h2>🔗 Structure Plots</h2>
+  <h2>📊 Structure Plots</h2>
   <div class="plot-gallery">
     {% for plot in struct_plots %}
     <div class="plot-card">
@@ -124,7 +124,7 @@
 
 <!-- Navigation -->
 <div class="card">
-  <h2>🔗 Navigation</h2>
+  <h2>🧭 Navigation</h2>
   <ul class="link-list">
     {% if prev_rate_url %}
     <li><a href="{{ prev_rate_url }}"><span>←</span><span>Previous Rate</span></a></li>
@@ -132,8 +132,8 @@
     {% if next_rate_url %}
     <li><a href="{{ next_rate_url }}"><span>→</span><span>Next Rate</span></a></li>
     {% endif %}
-    <li><a href="../trend_analysis/trend_report.html"><span>📈</span><span>Trend Analysis</span></a></li>
-    <li><a href="../summary.html"><span>📑</span><span>Dataset Summary</span></a></li>
+    <li><a href="../trend_analysis/trend_report.html"><span>📊</span><span>Trend Analysis</span></a></li>
+    <li><a href="../summary.html"><span>📄</span><span>Dataset Summary</span></a></li>
     <li><a href="data/metrics.json"><span>📄</span><span>metrics.json (raw data)</span></a></li>
   </ul>
 </div>

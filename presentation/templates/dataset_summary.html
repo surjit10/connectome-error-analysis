@@ -37,12 +37,12 @@
 
 <!-- Error rate navigation -->
 <div class="card">
-  <h2>📂 Experiments by Error Rate</h2>
+  <h2>📁 Experiments by Error Rate</h2>
   <ul class="link-list">
     {% for rate in rates %}
     <li>
       <a href="error_{{ rate.label }}/report.html">
-        <span>🔬</span>
+        <span>🔍</span>
         <span>Error {{ rate.label }}%</span>
         <span class="tag">{{ rate.n_trials }} trial(s)</span>
         {% if rate.n_sensitive > 0 %}
@@ -63,7 +63,7 @@
   </p>
   <ul class="link-list">
     <li><a href="trend_analysis/trend_report.html">
-      <span>📈</span><span>Open Trend Report</span>
+      <span>📊</span><span>Open Trend Report</span>
     </a></li>
   </ul>
 </div>
@@ -71,7 +71,7 @@
 <!-- Sensitivity ranking preview -->
 {% if sensitivity_rows %}
 <div class="card">
-  <h2>📊 Sensitivity Ranking (Preview)</h2>
+  <h2>📋 Sensitivity Ranking (Preview)</h2>
   <table class="data-table">
     <thead>
       <tr>

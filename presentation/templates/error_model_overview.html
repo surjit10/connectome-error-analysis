@@ -31,10 +31,10 @@
 
 {% for ds in datasets %}
 <div class="card">
-  <h2>📂 {{ ds.name }}</h2>
+  <h2>📁 {{ ds.name }}</h2>
   <ul class="link-list">
     <li><a href="{{ ds.name }}/summary.html">
-      <span>📑</span><span>Dataset Summary</span>
+      <span>📄</span><span>Dataset Summary</span>
       <span class="tag">{{ ds.n_rates }} error rate(s)</span>
     </a></li>
     <li><a href="{{ ds.name }}/trend_analysis/trend_report.html">
@@ -42,7 +42,7 @@
     </a></li>
     {% for rate in ds.rates %}
     <li><a href="{{ ds.name }}/error_{{ rate.label }}/report.html">
-      <span>🔬</span>
+      <span>🔍</span>
       <span>Error {{ rate.label }}%</span>
       <span class="tag">{{ rate.n_trials }} trial(s)</span>
     </a></li>
@@ -52,7 +52,7 @@
 {% endfor %}
 
 <div class="card">
-  <h2>🔬 Cross-Dataset Analysis</h2>
+  <h2>🔍 Cross-Dataset Analysis</h2>
   <p class="text-muted mt-1" style="font-size:0.85rem">
     Cross-dataset comparisons will appear here once multiple datasets are processed.
   </p>

@@ -42,7 +42,7 @@
     {% for dataset in model.datasets %}
     <li>
       <a href="{{ model.slug }}/{{ dataset.name }}/summary.html">
-        <span>📂</span>
+        <span>📁</span>
         <span>{{ dataset.name }}</span>
         <span class="tag">{{ dataset.n_rates }} rate(s)</span>
         <span class="tag">{{ dataset.n_trials }} trials</span>
@@ -51,7 +51,7 @@
     {% endfor %}
     <li>
       <a href="{{ model.slug }}/overview.html">
-        <span>🗂</span>
+        <span>📁</span>
         <span>Overview — {{ model.display_name }}</span>
         <span class="tag">overview</span>
       </a>
@@ -66,7 +66,7 @@
 
 {% if show_comparison %}
 <div class="card">
-  <h2>🔬 Cross-Dataset &amp; Cross-Model Comparisons</h2>
+  <h2>🔍 Cross-Dataset &amp; Cross-Model Comparisons</h2>
   <ul class="link-list">
     <li><a href="comparison/datasets/index.html"><span>📊</span><span>Dataset Comparisons</span></a></li>
     <li><a href="comparison/error_models/index.html"><span>📊</span><span>Error Model Comparisons</span></a></li>
