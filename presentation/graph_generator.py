@@ -170,7 +170,7 @@ class GraphGenerator:
         if not self.df_pres.empty:
             pivot_pres = self.df_pres.pivot(index="FullMetric", columns="Rate", values="Preservation")
             plt.figure(figsize=(8, 6))
-            sns.heatmap(pivot_pres, annot=True, cmap="RdYlGn", vmin=0, vmax=100, fmt=".2f")
+            sns.heatmap(pivot_pres, annot=True, cmap="RdYlGn", vmin=0, vmax=100, fmt=".4f")
             plt.title("Biological Preservation Heatmap (%)")
             plt.tight_layout()
             plt.savefig(self.output_dir / "preservation_heatmap.png")

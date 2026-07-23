@@ -32,6 +32,7 @@ from presentation.preservation_config import (
     is_preservation_metric,
     higher_is_better,
     KEY_INTEGRITY_METRICS,
+    format_integrity,
 )
 
 logger = logging.getLogger(__name__)
@@ -218,7 +219,7 @@ class DatasetExporter(BaseExporter):
             sensitivity_rows.append({
                 "rank":            rank,
                 "metric_key":      key,
-                "min_preservation": f"{min_pres:.2f}%",
+                "min_preservation": f"{min_pres:.4f}%",
                 "biological_status": bio_label,
                 "bio_css":         bio_css,
             })
@@ -234,11 +235,11 @@ class DatasetExporter(BaseExporter):
                 "n_rates":             len(sorted_rates),
                 "total_trials":        total_trials,
                 "n_metrics":           n_metrics,
-                "integrity_score":     f"{integrity_score:.2f}%",
+                "integrity_score":     f"{format_integrity(integrity_score)}%",
                 "integrity_emoji":     integrity_emoji,
                 "integrity_verdict":   integrity_verdict,
                 "integrity_css":       integrity_css,
-                "worst_preservation":  f"{worst_preservation:.2f}%",
+                "worst_preservation":  f"{worst_preservation:.4f}%",
                 "worst_metric":        worst_metric,
                 "rates":               rates_info,
                 "sensitivity_rows":    sensitivity_rows,

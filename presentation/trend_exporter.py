@@ -135,7 +135,7 @@ class TrendExporter(BaseExporter):
                     "std":            ev.std,
                     "ci_lower":       ev.ci_lower,
                     "ci_upper":       ev.ci_upper,
-                    "preservation_pct": round(preservation, 2),
+                    "preservation_pct": round(preservation, 4),
                     "biological_status": bio_label,
                 })
         self._write_csv(
@@ -156,7 +156,7 @@ class TrendExporter(BaseExporter):
             rows.append({
                 "rank":              rank,
                 "metric":            key,
-                "min_preservation":  round(min_preservation, 2),
+                "min_preservation":  round(min_preservation, 4),
                 "biological_status": bio_label,
             })
         self._write_csv(
@@ -202,8 +202,8 @@ class TrendExporter(BaseExporter):
 
         ranking = self._compute_preservation_ranking()
         all_preservations = [p for _, p in ranking]
-        min_preservation = f"{min(all_preservations):.2f}%" if all_preservations else "100.00%"
-        avg_preservation = f"{sum(all_preservations)/len(all_preservations):.2f}%" if all_preservations else "100.00%"
+        min_preservation = f"{min(all_preservations):.4f}%" if all_preservations else "100.0000%"
+        avg_preservation = f"{sum(all_preservations)/len(all_preservations):.4f}%" if all_preservations else "100.0000%"
         worst_metric = ranking[0][0] if ranking else "—"
 
         # Preservation table rows (metric × rate)
@@ -214,7 +214,7 @@ class TrendExporter(BaseExporter):
             for rate in rates:
                 pres = self._preservation_for_rate(rate, key)
                 _, bio_label, _ = get_biological_status(pres)
-                cells.append({"value": f"{pres:.2f}%", "label": bio_label})
+                cells.append({"value": f"{pres:.4f}%", "label": bio_label})
             preservation_table_rows.append({"metric": key, "cells": cells})
 
         # Preservation ranking table rows
@@ -224,7 +224,7 @@ class TrendExporter(BaseExporter):
             sensitivity_rows.append({
                 "rank":            rank,
                 "metric_key":      key,
-                "min_preservation": f"{min_pres:.2f}%",
+                "min_preservation": f"{min_pres:.4f}%",
                 "biological_status": bio_label,
                 "bio_css":         bio_css,
             })

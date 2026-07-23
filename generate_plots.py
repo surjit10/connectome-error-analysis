@@ -223,7 +223,7 @@ def main() -> None:
     ranking = sorted([(k, min(v)) for k, v in pres_vals.items()], key=lambda x: x[1])
     for rank, (key, min_pres) in enumerate(ranking, start=1):
         _, bio_label, _ = get_biological_status(min_pres)
-        print(f"{rank:<5} {key:<40} {min_pres:<10.2f}%    {bio_label}")
+        print(f"{rank:<5} {key:<40} {min_pres:<12.4f}%    {bio_label}")
     print("-" * 70)
     print(f"Preservation metrics: {len(ranking)}")
     
@@ -245,7 +245,7 @@ def main() -> None:
                     delta_pct = ((perturbed - baseline) / abs(baseline) * 100) if baseline != 0 else 0.0
                     is_inc = delta_pct > 0
                     interp = get_change_interpretation(key, delta_pct, is_inc)
-                    print(f"{key:<40} {baseline:<12.2f} {perturbed:<12.2f} {delta_pct:<+9.2f}%  {interp}")
+                    print(f"{key:<40} {baseline:<14.4f} {perturbed:<14.4f} {delta_pct:<+11.4f}%  {interp}")
             break  # Show first perturbed rate only
     print("-" * 70)
 

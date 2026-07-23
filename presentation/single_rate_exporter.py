@@ -45,6 +45,7 @@ from presentation.preservation_config import (
     render_preservation_metric,
     render_change_metric,
     _pct_change,
+    format_integrity,
 )
 
 logger = logging.getLogger(__name__)
@@ -144,7 +145,7 @@ class SingleRateExporter(BaseExporter):
                         ev.baseline_mean, ev.mean,
                         higher_is_better=higher_is_better(key),
                     )
-                    row["preservation_pct"] = round(pres, 2)
+                    row["preservation_pct"] = round(pres, 4)
                 else:
                     row["preservation_pct"] = ""
                 rows.append(row)
@@ -179,7 +180,7 @@ class SingleRateExporter(BaseExporter):
                         higher_is_better=higher_is_better(key),
                     )
                     _, bio_label, _ = get_biological_status(pres)
-                    entry["preservation_pct"] = round(pres, 2)
+                    entry["preservation_pct"] = round(pres, 4)
                     entry["biological_status"] = bio_label
                 else:
                     entry["preservation_pct"] = None
@@ -239,7 +240,7 @@ class SingleRateExporter(BaseExporter):
         if not key_rows:
             return 100.0, []
         integrity = sum(r["preservation_num"] for r in key_rows) / len(key_rows)
-        return round(integrity, 2), key_rows
+        return round(integrity, 4), key_rows
 
     def _render_report(
         self,
@@ -296,7 +297,7 @@ class SingleRateExporter(BaseExporter):
                 "change_rows":         change_rows,
                 "has_preservation":    n_preservation > 0,
                 "has_change":          n_change > 0,
-                "integrity_score":     f"{integrity_score:.2f}",
+                "integrity_score":     format_integrity(integrity_score),
                 "integrity_emoji":     integrity_emoji,
                 "integrity_verdict":   integrity_verdict,
                 "integrity_css":       integrity_css,

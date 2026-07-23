@@ -314,7 +314,7 @@ class TrendPlotter:
             fig, ax = plt.subplots(figsize=(max(6, len(rates) * 1.2 + 2), max(4, len(all_keys) * 0.45 + 1.5)))
             fig.patch.set_facecolor("#0d1117")
             sns.heatmap(
-                pres_df, annot=True, cmap="RdYlGn", vmin=0, vmax=100, fmt=".2f",
+                pres_df, annot=True, cmap="RdYlGn", vmin=0, vmax=100, fmt=".4f",
                 ax=ax, linewidths=0.3, linecolor=_GRID_COLOR,
                 annot_kws={"size": 7},
                 cbar_kws={"shrink": 0.8, "label": "Preservation (%)"},
@@ -433,7 +433,7 @@ class TrendPlotter:
             # Value labels
             for bar, val in zip(bars, values):
                 ax.text(val + 0.5, bar.get_y() + bar.get_height() / 2,
-                        f"{val:.2f}%", va="center", ha="left",
+                        f"{val:.4f}%", va="center", ha="left",
                         fontsize=7, color=_TEXT_MUTED)
 
             ax.set_xlim(0, 105)

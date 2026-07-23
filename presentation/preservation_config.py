@@ -259,7 +259,7 @@ def get_change_interpretation(
 
     # Build direction word
     direction_word = "increase" if is_increase else "decrease"
-    delta_str = f"{'+' if is_increase else ''}{delta_pct:.2f}%"
+    delta_str = format_change(delta_pct)
 
     # Look up metric-specific template
     metric_templates = CHANGE_INTERPRETATION_TEMPLATES.get(metric_key, {})
@@ -383,8 +383,8 @@ def render_preservation_metric(
         "ci_upper":          _fmt(ci_upper),
         "delta_pct":         delta_pct,
         "delta_sign":        delta_sign,
-        "preservation":      f"{preservation:.2f}",
-        "preservation_num":  round(preservation, 2),
+        "preservation":      format_percentage(preservation),
+        "preservation_num":  round(preservation, 4),
         "bio_status":        bio_label,
         "bio_emoji":         emoji,
         "bio_css":           bio_css,
@@ -446,13 +446,45 @@ def render_change_metric(
 # ---------------------------------------------------------------------------
 
 
-def _pct_change(mean: float, baseline: float) -> Tuple[str, str]:
-    """Return (formatted_pct_string, sign_char)."""
+def format_percentage(value: float, decimals: int = 4) -> str:
+    """Format a preservation percentage with the given number of decimal places.
+
+    Metric-level percentages default to **4 decimal places** to avoid hiding
+    very small structural changes after rounding.
+
+    The overall Network Integrity Score uses ``format_integrity()`` (2 decimals)
+    instead.
+    """
+    return f"{value:.{decimals}f}"
+
+
+def format_change(delta_pct: float, decimals: int = 4) -> str:
+    """Format a percent-change value (Δ%) with sign and the given precision.
+
+    Metric-level changes default to **4 decimal places** so that tiny but real
+    changes (e.g. ``-0.0032%%``) are never hidden by rounding to ``-0.00%%``.
+    """
+    if not math.isfinite(delta_pct):
+        return "\u2014"
+    sign = "+" if delta_pct >= 0 else ""
+    return f"{sign}{delta_pct:.{decimals}f}%"
+
+
+def format_integrity(value: float) -> str:
+    """Format the overall Network Integrity Score (always 2 decimal places).
+
+    This summary value is kept concise for quick readability.
+    """
+    return f"{value:.2f}"
+
+
+def _pct_change(mean: float, baseline: float, decimals: int = 4) -> Tuple[str, str]:
+    """Return (formatted_pct_string, sign_char) with the given precision."""
     if baseline == 0 or not math.isfinite(baseline) or not math.isfinite(mean):
         return "\u2014", "="
     delta = (mean - baseline) / abs(baseline) * 100
     sign  = "+" if delta >= 0 else ""
-    return f"{sign}{delta:.2f}%", ("+" if delta >= 0 else "-")
+    return format_change(delta, decimals), ("+" if delta >= 0 else "-")
 
 
 def _fmt(value: float) -> str:
