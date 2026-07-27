@@ -1,0 +1,37 @@
+# ---------------------------------------------------------------------------
+# False Synapse (false-positive) Error Model Configuration
+# ---------------------------------------------------------------------------
+# This configuration is consumed by:
+#   - modules.error_models.false_synapses.model.FalseSynapseModel._perturb()
+#
+# All thresholds are grouped under the "biology" key, matching the existing
+# convention established by the missed-synapse error model.
+# ---------------------------------------------------------------------------
+
+error_model: false_synapses
+
+biology:
+  # -----------------------------------------------------------------------
+  # Candidate generation thresholds
+  # -----------------------------------------------------------------------
+  candidate_generation:
+    top_k_per_neuron: 50
+    min_region_size: 10
+    min_shared_neighbors: 1
+    jaccard_min: 0.001
+    redundancy_filter: true
+    cache_dir: research_data/cache/false_synapses
+
+  # -----------------------------------------------------------------------
+  # Weight assignment threshold
+  # -----------------------------------------------------------------------
+  weight_assignment:
+    # Maximum syn_count used when building the empirical weight distribution.
+    # 71.5 % of BANC edges have ≤5 synapses.
+    max_syn_count: 5
+
+  # -----------------------------------------------------------------------
+  # Biological constraints (always applied)
+  # -----------------------------------------------------------------------
+  region_constraint: true
+  soma_side_constraint: true

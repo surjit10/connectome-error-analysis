@@ -66,8 +66,8 @@ from core.graph_builder import GraphBuilder, GraphBuilderError
 from modules.preprocessing import preprocess_graph, PreparedGraph, PreprocessingError
 from modules.graph_analyses.analysis_registry import AnalysisRegistry
 from modules.graph_analyses.analysis_result import AnalysisResult, AnalysisStatus
-from modules.error_models.error_registry import ErrorRegistry
-from modules.error_models.error_result import ErrorResult, ErrorModelStatus
+from modules.error_models.common.error_registry import ErrorRegistry
+from modules.error_models.common.error_result import ErrorResult, ErrorModelStatus
 
 logger = logging.getLogger(__name__)
 
@@ -385,8 +385,8 @@ class ExperimentRunner:
         result.prepared_graph = prepared
 
         # ── Step 3.6: Biological Vulnerability (Phase 013) ───────────────
-        from modules.error_models.biology import BiologicalAssumptions
-        from modules.error_models.vulnerability import VulnerabilityModel
+        from modules.error_models.common.biology import BiologicalAssumptions
+        from modules.preprocessing.missed_synapses.vulnerability import VulnerabilityModel
         
         try:
             bio_assumptions = BiologicalAssumptions.from_config(config)
@@ -410,7 +410,7 @@ class ExperimentRunner:
             prepared.edge_features = None
 
         # ── Step 3.7: Probability Calibration (Phase 014) ────────────────
-        from modules.error_models.calibration import ProbabilityCalibrator
+        from modules.error_models.common.calibration import ProbabilityCalibrator
         
         try:
             target_error_rate = float(config.error_model_config.get("error_rate", 0.0))
@@ -461,12 +461,22 @@ class ExperimentRunner:
                 error_result = None  # fall back to baseline
 
         # ── Step 6: Build temporary analysis graph ───────────────────────
-        # If an error model produced a mask, build a temporary subgraph.
-        # Otherwise analyses run directly on the immutable baseline graph.
+        # If an error model produced a mask or added_edges, build a
+        # temporary subgraph.  Otherwise analyses run directly on the
+        # immutable baseline graph.
         temp_graph: Optional[igraph.Graph] = None
         analysis_target: PreparedGraph = prepared   # default: baseline
 
-        if error_result is not None and error_result.edge_mask is not None:
+        has_mask = (
+            error_result is not None
+            and error_result.edge_mask is not None
+        )
+        has_added_edges = (
+            error_result is not None
+            and len(error_result.added_edges) > 0
+        )
+
+        if has_mask or has_added_edges:
             temp_graph, temp_prepared = self._build_temp_graph(
                 prepared, error_result, config, result
             )
@@ -647,11 +657,24 @@ class ExperimentRunner:
         config: ExperimentConfig,
         result: ExperimentResult,
     ) -> tuple:
-        """Build a temporary igraph subgraph from the baseline + edge_mask.
+        """Build a temporary igraph subgraph from the baseline + perturbation.
 
-        The baseline graph is read-only.  The temporary graph is a new
-        igraph.Graph containing only the edges where ``edge_mask[i] == True``,
-        with any ``weight_updates`` applied.
+        Supports two perturbation types:
+
+        1. **Edge mask (missed-synapse style):**
+           ``error_result.edge_mask`` — boolean list, ``True`` = keep edge.
+           Creates a subgraph with only active edges via
+           ``baseline.subgraph_edges(mask)``.
+
+        2. **Added edges (false-synapse style):**
+           ``error_result.added_edges`` — list of ``(pre_root_id,
+           post_root_id, weight)`` tuples.  Creates a copy of the baseline
+           via ``baseline.copy()`` and calls ``add_edges()``.
+
+        Both perturbation types can coexist (e.g. a model that removes some
+        edges and adds others).
+
+        The baseline graph is **never** modified.
 
         Returns:
             ``(temp_graph, temp_PreparedGraph)`` on success, or
@@ -661,27 +684,63 @@ class ExperimentRunner:
 
         try:
             baseline: igraph.Graph = prepared.graph
-            mask: List[bool] = error_result.edge_mask
+            mask: Optional[List[bool]] = error_result.edge_mask
             weight_updates: Dict[int, float] = error_result.weight_updates
+            added_edges: List[tuple] = error_result.added_edges
 
-            # Collect active edge indices.
-            active_edge_indices = [
-                i for i, active in enumerate(mask) if active
-            ]
+            has_mask = mask is not None
+            has_added = len(added_edges) > 0
 
-            # Build the subgraph using igraph's subgraph_edges.
-            # This creates a new igraph.Graph that does NOT share references
-            # with the baseline — safe to discard after analysis.
-            temp_graph: igraph.Graph = baseline.subgraph_edges(
-                active_edge_indices, delete_vertices=False
-            )
+            # ------------------------------------------------------------------
+            # Build base temporary graph
+            # ------------------------------------------------------------------
+            # Common: build added_indices + added_edge_weights for any added_edges.
+            added_indices_list: List[tuple] = []
+            added_weights_list: List[float] = []
+            if has_added:
+                id_to_idx = prepared.lookup.id_to_idx
+                for pre_rid, post_rid, weight in added_edges:
+                    src = id_to_idx.get(pre_rid)
+                    dst = id_to_idx.get(post_rid)
+                    if src is not None and dst is not None:
+                        added_indices_list.append((src, dst))
+                        added_weights_list.append(float(weight))
 
-            # Apply weight updates to the temporary graph.
-            if weight_updates:
-                baseline_to_temp: Dict[int, int] = {
-                    baseline_idx: temp_idx
-                    for temp_idx, baseline_idx in enumerate(active_edge_indices)
-                }
+            # Build base temporary graph based on the perturbation type.
+            if has_mask and not has_added:
+                # Missed-synapse style: subgraph from mask.
+                active_edge_indices = [
+                    i for i, active in enumerate(mask) if active
+                ]
+                temp_graph: igraph.Graph = baseline.subgraph_edges(
+                    active_edge_indices, delete_vertices=False
+                )
+
+            elif has_added and not has_mask:
+                # False-synapse style: copy + add_edges.
+                temp_graph = baseline.copy()
+                if added_indices_list:
+                    temp_graph.add_edges(added_indices_list)
+
+            elif has_mask and has_added:
+                # Combined: apply mask first, then add edges.
+                active_edge_indices = [
+                    i for i, active in enumerate(mask) if active
+                ]
+                temp_graph = baseline.subgraph_edges(
+                    active_edge_indices, delete_vertices=False
+                )
+                if added_indices_list:
+                    temp_graph.add_edges(added_indices_list)
+
+            else:
+                # No perturbation — use baseline as-is.
+                temp_graph = baseline  # type: ignore[unreachable]
+
+            # ------------------------------------------------------------------
+            # Apply weight updates (for mask-based models)
+            # ------------------------------------------------------------------
+            if has_mask and weight_updates:
                 weight_attr = (
                     "syn_count"
                     if "syn_count" in temp_graph.edge_attributes()
@@ -689,17 +748,36 @@ class ExperimentRunner:
                 )
                 if weight_attr in temp_graph.edge_attributes():
                     for baseline_idx, new_weight in weight_updates.items():
-                        temp_idx = baseline_to_temp.get(baseline_idx)
-                        if temp_idx is not None:
-                            temp_graph.es[temp_idx][weight_attr] = new_weight
+                        if baseline_idx < temp_graph.ecount():
+                            temp_graph.es[baseline_idx][weight_attr] = new_weight
 
-            # Copy graph-level metadata from baseline so preprocessing works.
+            # ------------------------------------------------------------------
+            # Set weight attributes for added edges
+            # ------------------------------------------------------------------
+            if added_weights_list:
+                # The added edges are the last N edges in the temp graph.
+                base_count = temp_graph.ecount() - len(added_weights_list)
+                weight_attr = (
+                    "syn_count"
+                    if "syn_count" in temp_graph.edge_attributes()
+                    else "weight"
+                )
+                for i, w in enumerate(added_weights_list):
+                    edge_idx = base_count + i
+                    if edge_idx < temp_graph.ecount():
+                        temp_graph.es[edge_idx][weight_attr] = w
+
+            # ------------------------------------------------------------------
+            # Copy graph-level metadata so preprocessing works
+            # ------------------------------------------------------------------
             for attr in baseline.attributes():
                 temp_graph[attr] = baseline[attr]
             temp_graph["edge_count"] = temp_graph.ecount()
             temp_graph["node_count"] = temp_graph.vcount()
 
-            # Wrap in a PreparedGraph (lightweight — reuse baseline features).
+            # ------------------------------------------------------------------
+            # Wrap in a PreparedGraph (lightweight — reuse baseline features)
+            # ------------------------------------------------------------------
             temp_prepared = preprocess_graph(
                 temp_graph,
                 expected_node_attrs=config.preprocessing_config.get(
@@ -711,8 +789,6 @@ class ExperimentRunner:
                 index_node_attrs=config.preprocessing_config.get(
                     "index_node_attrs"
                 ),
-                # Reuse baseline features — do not recompute on the
-                # temporary graph (they describe the baseline population).
                 feature_config={
                     "indegree": False,
                     "outdegree": False,
@@ -723,8 +799,6 @@ class ExperimentRunner:
                     "two_hop_size": False,
                 },
             )
-            # Attach the baseline features to the temp PreparedGraph so
-            # analyses can still access them.
             temp_prepared.baseline_features = prepared.baseline_features
 
             return temp_graph, temp_prepared

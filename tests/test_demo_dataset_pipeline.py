@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 from core.experiment_runner import ExperimentRunner, ExperimentConfig
-from modules.error_models.error_registry import registry as error_registry
+from modules.error_models.common.error_registry import registry as error_registry
 from modules.graph_analyses.analysis_registry import registry as analysis_registry
 from modules.statistical_evaluation import StatisticalEvaluator
 from core.export_manager import ExportManager

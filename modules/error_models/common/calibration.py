@@ -11,7 +11,7 @@ import numpy as np
 import polars as pl
 from typing import Any
 
-from modules.error_models.vulnerability import EdgeVulnerabilityTable
+from modules.preprocessing.missed_synapses.vulnerability import EdgeVulnerabilityTable
 
 logger = logging.getLogger(__name__)
 

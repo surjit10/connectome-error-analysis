@@ -34,15 +34,15 @@ Typical concrete model authoring::
     registry.register(MissedSynapses)
 """
 
-from .exceptions import (
+from .common.exceptions import (
     ErrorModelFrameworkError,
     ErrorModelExecutionError,
     InvalidInputError,
     ErrorRegistryError,
 )
-from .error_result import ErrorResult, ErrorModelStatus
-from .base_error_model import BaseErrorModel
-from .error_registry import ErrorRegistry, registry
+from .common.error_result import ErrorResult, ErrorModelStatus
+from .common.base_error_model import BaseErrorModel
+from .common.error_registry import ErrorRegistry, registry
 
 __all__ = [
     # Core contract
@@ -61,3 +61,4 @@ __all__ = [
 
 # Auto-register standard models
 from . import missed_synapses
+from . import false_synapses

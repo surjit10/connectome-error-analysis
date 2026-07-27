@@ -88,6 +88,7 @@ class ErrorResult:
     config_snapshot: Dict[str, Any] = field(default_factory=dict)
     edge_mask: Optional[List[bool]] = None
     weight_updates: Dict[int, float] = field(default_factory=dict)
+    added_edges: List[tuple] = field(default_factory=list)
     perturbation_metadata: Dict[str, Any] = field(default_factory=dict)
     warnings: List[str] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
@@ -110,7 +111,7 @@ class ErrorResult:
     @property
     def has_perturbation(self) -> bool:
         """``True`` when a valid edge_mask is available."""
-        return self.edge_mask is not None
+        return self.edge_mask is not None or len(self.added_edges) > 0
 
     # ------------------------------------------------------------------ #
     # Serialisation helpers                                                #
@@ -135,6 +136,7 @@ class ErrorResult:
             "active_edges":           active,
             "suppressed_edges":       suppressed,
             "weight_update_count":    len(self.weight_updates),
+            "added_edge_count":       len(self.added_edges),
             "perturbation_metadata":  self.perturbation_metadata,
             "warnings":               self.warnings,
             "errors":                 self.errors,

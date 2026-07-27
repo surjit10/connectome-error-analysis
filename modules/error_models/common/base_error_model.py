@@ -48,7 +48,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from modules.preprocessing.prepared_graph import PreparedGraph
+from modules.preprocessing.common.prepared_graph import PreparedGraph
 from .error_result import ErrorResult, ErrorModelStatus
 from .exceptions import InvalidInputError
 

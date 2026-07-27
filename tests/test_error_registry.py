@@ -1,5 +1,5 @@
 import pytest
-from modules.error_models.error_registry import ErrorRegistry
+from modules.error_models.common.error_registry import ErrorRegistry
 from tests.dummy_modules.dummy_error_model import DummyErrorModel
 from modules.preprocessing import preprocess_graph
 import igraph

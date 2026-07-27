@@ -24,12 +24,12 @@ from typing import Any, Optional
 
 import igraph
 
-from .metadata import GraphMetadata
-from .lookup import GraphLookup
-from .validator import ValidationReport
+from ..common.metadata import GraphMetadata
+from ..common.lookup import GraphLookup
+from ..common.validator import ValidationReport
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from modules.preprocessing.biological_features import EdgeFeatureTable
+    from modules.preprocessing.missed_synapses.biological_features import EdgeFeatureTable
 
 
 logger = logging.getLogger(__name__)

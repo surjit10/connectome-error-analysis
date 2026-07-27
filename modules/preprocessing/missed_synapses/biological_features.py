@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import polars as pl
 from typing import Any
 
-from modules.preprocessing.prepared_graph import PreparedGraph
+from modules.preprocessing.common.prepared_graph import PreparedGraph
 
 logger = logging.getLogger(__name__)
 

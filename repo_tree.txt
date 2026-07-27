@@ -1,0 +1,434 @@
+.
+├── 0-input data
+├── 0-results(store)
+│   ├── BANC
+│   │   ├── MissedSynapses_BANC_complete.zip
+│   │   └── missed_synapses_presentation
+│   │       └── presentation
+│   ├── index.html
+│   ├── missed_synapses
+│   │   ├── BANC
+│   │   │   ├── error_0
+│   │   │   ├── error_1
+│   │   │   ├── error_10
+│   │   │   ├── error_15
+│   │   │   ├── error_2
+│   │   │   ├── error_20
+│   │   │   ├── error_5
+│   │   │   ├── summary.html
+│   │   │   └── trend_analysis
+│   │   ├── cross_dataset_analysis
+│   │   └── overview.html
+│   └── TEST
+│       ├── Demo_Experiment_complete.zip
+│       └── missed_synapses
+│           ├── 0_percent
+│           ├── 10_percent
+│           └── presentation
+├── 0-storage
+│   ├── 0-demodata
+│   │   └── TEST_v1
+│   │       ├── connections.csv
+│   │       ├── neurons.csv
+│   │       └── README.md
+│   ├── 0-reference
+│   │   ├── 1-research -execution-pipeline.md
+│   │   ├── architecture analysis
+│   │   │   ├── 1.md
+│   │   │   ├── 2.md
+│   │   │   ├── 3.md
+│   │   │   ├── 4-kaggle output analysis.md
+│   │   │   └── 5-memory leak.md
+│   │   ├── each part implementation plan
+│   │   │   ├── 1.md
+│   │   │   ├── 2_detailed.md
+│   │   │   └── 3_detailed.md
+│   │   ├── execution_flow.md
+│   │   ├── prompts
+│   │   │   └── 0-plan
+│   │   └── test
+│   │       └── 001-010 phase1.md
+│   ├── Demo_Experiment_complete.zip
+│   ├── experiments_missed_synapses.ipynb
+│   ├── flywire_all_datasets.zip
+│   ├── flywire_codebase_kaggle.zip
+│   ├── flywire_codebase_with_full_analysis.zip
+│   ├── flywire_codebase.zip
+│   ├── generate_test_dataset.py
+│   ├── MissedSynapses_BANC_results
+│   │   ├── 0_percent
+│   │   │   ├── trial_001
+│   │   │   ├── trial_002
+│   │   │   ├── trial_003
+│   │   │   ├── trial_004
+│   │   │   └── trial_005
+│   │   ├── 10_percent
+│   │   │   ├── trial_001
+│   │   │   ├── trial_002
+│   │   │   ├── trial_003
+│   │   │   ├── trial_004
+│   │   │   └── trial_005
+│   │   ├── 1_percent
+│   │   │   ├── trial_001
+│   │   │   ├── trial_002
+│   │   │   ├── trial_003
+│   │   │   ├── trial_004
+│   │   │   └── trial_005
+│   │   ├── 20_percent
+│   │   │   ├── trial_001
+│   │   │   ├── trial_002
+│   │   │   ├── trial_003
+│   │   │   ├── trial_004
+│   │   │   └── trial_005
+│   │   └── 5_percent
+│   │       ├── trial_001
+│   │       ├── trial_002
+│   │       ├── trial_003
+│   │       ├── trial_004
+│   │       └── trial_005
+│   ├── pytest_output.txt
+│   ├── results_backup
+│   │   ├── presentation
+│   │   │   ├── confidence_intervals.csv
+│   │   │   ├── dashboard_data.json
+│   │   │   ├── dashboard_metadata.json
+│   │   │   ├── effect_sizes.csv
+│   │   │   ├── experiment_index.json
+│   │   │   ├── global_statistics.csv
+│   │   │   ├── global_statistics.json
+│   │   │   ├── plots
+│   │   │   └── summary_statistics.csv
+│   │   └── TEST
+│   │       └── missed_synapses
+│   ├── update_notebook_demodata.py
+│   ├── update_notebook_phase017.py
+│   └── update_notebook_phase018.py
+├── 0-temp
+│   ├── MissedSynapses_BANC_results
+│   │   ├── 0_25_percent
+│   │   │   ├── trial_001
+│   │   │   ├── trial_002
+│   │   │   ├── trial_003
+│   │   │   ├── trial_004
+│   │   │   └── trial_005
+│   │   ├── 0_5_percent
+│   │   │   ├── trial_001
+│   │   │   ├── trial_002
+│   │   │   ├── trial_003
+│   │   │   ├── trial_004
+│   │   │   └── trial_005
+│   │   ├── 0_75_percent
+│   │   │   ├── trial_001
+│   │   │   ├── trial_002
+│   │   │   ├── trial_003
+│   │   │   ├── trial_004
+│   │   │   └── trial_005
+│   │   ├── 0_percent
+│   │   │   ├── trial_001
+│   │   │   ├── trial_002
+│   │   │   ├── trial_003
+│   │   │   ├── trial_004
+│   │   │   └── trial_005
+│   │   ├── 10_percent
+│   │   │   ├── trial_001
+│   │   │   ├── trial_002
+│   │   │   ├── trial_003
+│   │   │   ├── trial_004
+│   │   │   └── trial_005
+│   │   ├── 15_percent
+│   │   │   ├── trial_001
+│   │   │   ├── trial_002
+│   │   │   ├── trial_003
+│   │   │   ├── trial_004
+│   │   │   └── trial_005
+│   │   ├── 1_percent
+│   │   │   ├── trial_001
+│   │   │   ├── trial_002
+│   │   │   ├── trial_003
+│   │   │   ├── trial_004
+│   │   │   └── trial_005
+│   │   ├── 20_percent
+│   │   │   ├── trial_001
+│   │   │   ├── trial_002
+│   │   │   ├── trial_003
+│   │   │   ├── trial_004
+│   │   │   └── trial_005
+│   │   ├── 2_percent
+│   │   │   ├── trial_001
+│   │   │   ├── trial_002
+│   │   │   ├── trial_003
+│   │   │   ├── trial_004
+│   │   │   └── trial_005
+│   │   ├── 5_percent
+│   │   │   ├── trial_001
+│   │   │   ├── trial_002
+│   │   │   ├── trial_003
+│   │   │   ├── trial_004
+│   │   │   └── trial_005
+│   │   ├── index.html
+│   │   └── missed_synapses
+│   │       └── BANC
+│   ├── MissedSynapses_BANC_results (1).zip
+│   ├── MissedSynapses_BANC_results.zip
+│   └── regenerate_presentation.py
+├── 2-flywire-missing-synapse-naming-ocrrected.ipynb
+├── cleanup_duplicates.sh
+├── configs
+│   ├── analyses
+│   │   ├── biological.yaml
+│   │   ├── centrality.yaml
+│   │   ├── community.yaml
+│   │   ├── conserved_circuits.yaml
+│   │   ├── matching.yaml
+│   │   └── structural.yaml
+│   ├── datasets
+│   │   ├── banc.yaml
+│   │   ├── fafb.yaml
+│   │   ├── manc.yaml
+│   │   ├── maol.yaml
+│   │   ├── mcns.yaml
+│   │   └── test.yaml
+│   ├── defaults.yaml
+│   ├── error_models
+│   │   ├── false_negatives.yaml
+│   │   ├── false_positives.yaml
+│   │   └── merge_errors.yaml
+│   ├── experiments
+│   │   ├── false_negatives
+│   │   │   ├── biological
+│   │   │   ├── centrality
+│   │   │   ├── community
+│   │   │   ├── conserved_circuits
+│   │   │   ├── matching
+│   │   │   └── structural
+│   │   ├── false_positives
+│   │   │   ├── biological
+│   │   │   ├── centrality
+│   │   │   ├── community
+│   │   │   ├── conserved_circuits
+│   │   │   ├── matching
+│   │   │   └── structural
+│   │   ├── localized_errors
+│   │   │   ├── biological
+│   │   │   ├── centrality
+│   │   │   ├── community
+│   │   │   ├── conserved_circuits
+│   │   │   ├── matching
+│   │   │   └── structural
+│   │   ├── merge_errors
+│   │   │   ├── biological
+│   │   │   ├── centrality
+│   │   │   ├── community
+│   │   │   ├── conserved_circuits
+│   │   │   ├── matching
+│   │   │   └── structural
+│   │   ├── split_errors
+│   │   │   ├── biological
+│   │   │   ├── centrality
+│   │   │   ├── community
+│   │   │   ├── conserved_circuits
+│   │   │   ├── matching
+│   │   │   └── structural
+│   │   └── weight_noise
+│   │       ├── biological
+│   │       ├── centrality
+│   │       ├── community
+│   │       ├── conserved_circuits
+│   │       ├── matching
+│   │       └── structural
+│   └── schemas
+│       ├── biological_schema.yaml
+│       ├── dataset_schema.yaml
+│       ├── error_model_schema.yaml
+│       └── experiment_schema.yaml
+├── core
+│   ├── checkpoint_manager.py
+│   ├── config_manager.py
+│   ├── data_loader.py
+│   ├── dataset_registry.py
+│   ├── experiment_runner.py
+│   ├── export_manager.py
+│   ├── graph_builder.py
+│   ├── __init__.py
+│   ├── metadata_manager.py
+│   ├── runtime_monitor.py
+│   └── statistics_engine.py
+├── docs
+│   ├── architecture
+│   │   └── flywire_architecture.md
+│   ├── dataset_analysis
+│   │   ├── 01_dataset_inventory.md
+│   │   ├── 02_file_analysis.md
+│   │   ├── 03_csv_schema.md
+│   │   ├── 04_common_schema.md
+│   │   ├── 05_dataset_differences.md
+│   │   ├── 06_relationships.md
+│   │   ├── 07_loader_requirements.md
+│   │   ├── 08_standard_dataset_object.md
+│   │   ├── 09_risks.md
+│   │   ├── 10_phase4_recommendations.md
+│   │   ├── dataset_analysis_summary.md
+│   │   └── README.md
+│   ├── Execution_Guide.md
+│   ├── experiment_tracker.csv
+│   ├── Methodology.md
+│   └── notes
+│       ├── Week01.md
+│       ├── Week02.md
+│       └── Week03.md
+├── fix_notebook.py
+├── flywire_codebase.zip
+├── .freebuff
+│   ├── desktop.db
+│   ├── desktop.db-shm
+│   └── desktop.db-wal
+├── generate_plots.py
+├── .github
+├── .gitignore
+├── modules
+│   ├── downstream_tasks
+│   ├── error_models
+│   │   ├── base_error_model.py
+│   │   ├── biology.py
+│   │   ├── calibration.py
+│   │   ├── error_registry.py
+│   │   ├── error_result.py
+│   │   ├── exceptions.py
+│   │   ├── __init__.py
+│   │   ├── missed_synapses.py
+│   │   └── utils.py
+│   ├── graph_analyses
+│   │   ├── analysis_registry.py
+│   │   ├── analysis_result.py
+│   │   ├── base_analysis.py
+│   │   ├── biological.py
+│   │   ├── centrality.py
+│   │   ├── exceptions.py
+│   │   ├── __init__.py
+│   │   ├── network_statistics.py
+│   │   ├── structural.py
+│   │   └── utils.py
+│   ├── preprocessing
+│   │   ├── common
+│   │   │   ├── __init__.py
+│   │   │   ├── lookup.py
+│   │   │   ├── metadata.py
+│   │   │   ├── pipeline.py
+│   │   │   ├── prepared_graph.py
+│   │   │   └── validator.py
+│   │   ├── false_synapses
+│   │   │   └── __init__.py
+│   │   ├── __init__.py
+│   │   └── missed_synapses
+│   │       ├── biological_features.py
+│   │       ├── __init__.py
+│   │       └── vulnerability.py
+│   ├── reporting
+│   │   ├── comparison_analysis.py
+│   │   ├── data_loader.py
+│   │   ├── __init__.py
+│   │   ├── sensitivity_analysis.py
+│   │   └── trend_analysis.py
+│   └── statistical_evaluation
+│       ├── evaluator.py
+│       ├── __init__.py
+│       └── vector_comparison.py
+├── notebooks
+│   ├── 01_run_experiment.ipynb
+│   ├── 02_compare_datasets.ipynb
+│   ├── 03_generate_paper.ipynb
+│   └── experiments_missed_synapses.ipynb
+├── presentation
+│   ├── base_exporter.py
+│   ├── dashboard_serializer.py
+│   ├── dataset_exporter.py
+│   ├── error_model_exporter.py
+│   ├── graph_generator.py
+│   ├── __init__.py
+│   ├── presentation_export.py
+│   ├── presentation_models.py
+│   ├── preservation_config.py
+│   ├── root_index_exporter.py
+│   ├── single_rate_exporter.py
+│   ├── single_rate_plotter.py
+│   ├── templates
+│   │   ├── base.html
+│   │   ├── dataset_summary.html
+│   │   ├── error_model_overview.html
+│   │   ├── root_index.html
+│   │   ├── single_rate_report.html
+│   │   └── trend_report.html
+│   ├── trend_exporter.py
+│   └── trend_plotter.py
+├── .pytest_cache
+│   ├── CACHEDIR.TAG
+│   ├── .gitignore
+│   ├── README.md
+│   └── v
+│       └── cache
+│           ├── lastfailed
+│           └── nodeids
+├── README.md
+├── repo_tree.txt
+├── requirements.txt
+├── research_data
+│   ├── cache
+│   ├── checkpoints
+│   ├── experiments
+│   ├── logs
+│   └── raw
+│       ├── BANC_v888
+│       │   ├── connections_princeton.csv.gz
+│       │   └── neurons.csv.gz
+│       ├── FAFB_v783
+│       │   ├── classification.csv.gz
+│       │   ├── connections_princeton.csv.gz
+│       │   ├── consolidated_cell_types.csv.gz
+│       │   └── neurons.csv.gz
+│       ├── MANC_v1.2.1
+│       │   ├── connections_princeton.csv.gz
+│       │   └── neurons.csv.gz
+│       ├── MAOL_v1.1
+│       │   ├── connections_princeton.csv.gz
+│       │   └── neurons.csv.gz
+│       └── MCNS_v0.9
+│           ├── connections_princeton.csv.gz
+│           └── neurons.csv.gz
+├── results
+│   ├── index.html
+│   └── missed_synapses
+│       ├── BANC
+│       │   ├── error_0
+│       │   ├── error_1
+│       │   ├── error_10
+│       │   ├── error_20
+│       │   ├── error_5
+│       │   ├── summary.html
+│       │   └── trend_analysis
+│       ├── cross_dataset_analysis
+│       └── overview.html
+├── results.zip
+├── run_demo.py
+└── tests
+    ├── conftest.py
+    ├── dummy_modules
+    │   ├── dummy_analysis.py
+    │   ├── dummy_error_model.py
+    │   └── __init__.py
+    ├── __init__.py
+    ├── test_analysis_registry.py
+    ├── test_config_manager.py
+    ├── test_config_validation.py
+    ├── test_data_loader.py
+    ├── test_dataset_registry.py
+    ├── test_demo_dataset_pipeline.py
+    ├── test_error_registry.py
+    ├── test_experiment_runner.py
+    ├── test_full_pipeline.py
+    ├── test_graph_builder.py
+    ├── test_preprocessing.py
+    ├── test_statistics_export.py
+    ├── test_validation_e2e.py
+    └── test_vector_comparison.py
+
+224 directories, 208 files

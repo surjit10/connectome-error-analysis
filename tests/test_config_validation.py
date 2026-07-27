@@ -17,8 +17,8 @@ from core.experiment_runner import ExperimentRunner, ExperimentConfig, Experimen
 from modules.graph_analyses.analysis_registry import registry as analysis_registry
 from modules.graph_analyses.base_analysis import BaseAnalysis
 from modules.graph_analyses.exceptions import RegistryError
-from modules.error_models.error_registry import registry as error_registry
-from modules.preprocessing.prepared_graph import PreparedGraph
+from modules.error_models.common.error_registry import registry as error_registry
+from modules.preprocessing.common.prepared_graph import PreparedGraph
 
 
 # ===================================================================

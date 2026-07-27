@@ -1,0 +1,3 @@
+required_keys:
+- dataset_name
+- dataset_root

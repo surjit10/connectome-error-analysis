@@ -57,11 +57,11 @@ from typing import Dict, Any, List, Optional
 
 import igraph
 
-from .validator import GraphValidator, ValidationReport
-from .metadata import build_metadata, GraphMetadata
-from .lookup import build_lookup, GraphLookup
-from .prepared_graph import PreparedGraph
-from .biological_features import extract_biological_features
+from ..common.validator import GraphValidator, ValidationReport
+from ..common.metadata import build_metadata, GraphMetadata
+from ..common.lookup import build_lookup, GraphLookup
+from ..common.prepared_graph import PreparedGraph
+from ..missed_synapses.biological_features import extract_biological_features
 
 logger = logging.getLogger(__name__)
 

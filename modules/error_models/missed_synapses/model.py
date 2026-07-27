@@ -11,9 +11,9 @@ from typing import Any, Dict
 
 import numpy as np
 
-from .base_error_model import BaseErrorModel
-from .error_result import ErrorResult
-from modules.preprocessing.prepared_graph import PreparedGraph
+from ..common.base_error_model import BaseErrorModel
+from ..common.error_result import ErrorResult
+from modules.preprocessing.common.prepared_graph import PreparedGraph
 
 logger = logging.getLogger(__name__)
 
@@ -112,5 +112,5 @@ class MissedSynapsesModel(BaseErrorModel):
         )
 
 # Register the model
-from modules.error_models.error_registry import registry
+from ..common.error_registry import registry
 registry.register(MissedSynapsesModel, overwrite=True)

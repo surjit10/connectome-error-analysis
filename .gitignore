@@ -31,5 +31,6 @@ update_notebook_*.py
 pytest_output.txt
 
 results/
+0-results(store)/
 flywire_codebase/
 *_results/

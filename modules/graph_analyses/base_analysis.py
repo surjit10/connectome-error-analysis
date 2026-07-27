@@ -40,7 +40,7 @@ import logging
 import time
 from typing import Any, Dict, Optional
 
-from modules.preprocessing.prepared_graph import PreparedGraph
+from modules.preprocessing.common.prepared_graph import PreparedGraph
 from .analysis_result import AnalysisResult, AnalysisStatus
 from .exceptions import AnalysisExecutionError, InvalidInputError
 

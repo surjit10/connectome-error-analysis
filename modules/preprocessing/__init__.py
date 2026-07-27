@@ -18,11 +18,12 @@ Typical usage::
     indegrees = prepared.baseline_features.get("indegree", [])
 """
 
-from .validator import GraphValidator, ValidationReport, ValidationSeverity
-from .metadata import GraphMetadata
-from .lookup import GraphLookup
-from .prepared_graph import PreparedGraph
-from .pipeline import preprocess_graph, PreprocessingError
+from .common.validator import GraphValidator, ValidationReport, ValidationSeverity
+from .common.metadata import GraphMetadata
+from .common.lookup import GraphLookup
+from .common.prepared_graph import PreparedGraph
+from .common.pipeline import preprocess_graph, PreprocessingError
+from .false_synapses.candidate_generator import CandidateGenerator
 
 __all__ = [
     # Pipeline entry-point
@@ -36,5 +37,6 @@ __all__ = [
     "GraphValidator",
     "ValidationReport",
     "ValidationSeverity",
+    # False-synapse candidate generation
+    "CandidateGenerator",
 ]
-
