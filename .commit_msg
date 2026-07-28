@@ -1,12 +1,8 @@
-Fix edge-weight attribute inconsistency across analysis pipeline
+Fix synapse weight propagation and integer type consistency
 
-GraphBuilder and error models use the biological edge attribute `syn_count`,
-while several weighted graph analyses only checked for the `weight`
-attribute. Since FlyWire datasets do not create a `weight` edge attribute,
-weighted analyses silently fell back to unweighted computation.
-
-Updated weighted analysis modules to follow the framework convention:
-prefer `syn_count`, fall back to `weight`, then `None`.
-
-This restores correct propagation of edge weights without changing the
-existing architecture or public APIs.
+- Use the canonical `syn_count` edge attribute throughout weighted analyses.
+- Fix EM3 to preserve integer synapse counts in `weight_updates`.
+- Fix EM2 temporary graph construction to preserve integer `syn_count` values for added edges.
+- Eliminate mixed int/float edge attributes that caused Polars Int64 schema errors during preprocessing.
+- Restore correct propagation of perturbed edge weights into preprocessing and weighted graph analyses.
+- Maintain consistent integer representation of biological synapse counts across GraphBuilder, error models, runner, and analysis pipeline.

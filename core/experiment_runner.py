@@ -700,7 +700,7 @@ class ExperimentRunner:
             # ------------------------------------------------------------------
             # Common: build added_indices + added_edge_weights for any added_edges.
             added_indices_list: List[tuple] = []
-            added_weights_list: List[float] = []
+            added_weights_list: List[int] = []
             if has_added:
                 id_to_idx = prepared.lookup.id_to_idx
                 for pre_rid, post_rid, weight in added_edges:
@@ -708,7 +708,7 @@ class ExperimentRunner:
                     dst = id_to_idx.get(post_rid)
                     if src is not None and dst is not None:
                         added_indices_list.append((src, dst))
-                        added_weights_list.append(float(weight))
+                        added_weights_list.append(int(weight))
 
             # Build base temporary graph based on the perturbation type.
             if has_mask and not has_added:

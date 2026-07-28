@@ -110,7 +110,7 @@ class SynapseCountMeasurementError(BaseErrorModel):
 
         weight_updates: Dict[int, float] = {}
         for idx in changed_indices:
-            weight_updates[int(idx)] = float(new_weights[idx])
+            weight_updates[int(idx)] = int(new_weights[idx])
 
         # ── Quality-control statistics ───────────────────────────────────
         total_original = original_weights.sum()
