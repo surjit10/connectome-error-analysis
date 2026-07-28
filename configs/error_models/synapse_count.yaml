@@ -1,0 +1,19 @@
+# ---------------------------------------------------------------------------
+# Synapse Count Measurement Error Model Configuration
+# ---------------------------------------------------------------------------
+# Consumed by modules.error_models.synapse_count.model._perturb()
+#
+# Interpretation:
+#   error_rate in this context means relative measurement uncertainty,
+#   NOT fraction of edges modified.  E.g. error_rate=0.05 means
+#   σ = 0.05 × original_weight for every edge.
+#
+# Unlike EM1 and EM2, no biological thresholds or candidate-generation
+# parameters are needed — this model operates purely on edge weights.
+# ---------------------------------------------------------------------------
+
+error_model: synapse_count_measurement
+
+# No biology section is required for this model.  The measurement model
+# operates on every edge independently using only the edge weight and the
+# configured error_rate.

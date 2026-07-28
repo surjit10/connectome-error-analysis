@@ -475,8 +475,12 @@ class ExperimentRunner:
             error_result is not None
             and len(error_result.added_edges) > 0
         )
+        has_weight_perturbation = (
+            error_result is not None
+            and len(error_result.weight_updates) > 0
+        )
 
-        if has_mask or has_added_edges:
+        if has_mask or has_added_edges or has_weight_perturbation:
             temp_graph, temp_prepared = self._build_temp_graph(
                 prepared, error_result, config, result
             )
@@ -738,18 +742,25 @@ class ExperimentRunner:
                 temp_graph = baseline  # type: ignore[unreachable]
 
             # ------------------------------------------------------------------
-            # Apply weight updates (for mask-based models)
+            # Apply weight updates (for all perturbation types)
             # ------------------------------------------------------------------
-            if has_mask and weight_updates:
+            has_weight_updates = len(weight_updates) > 0
+
+            if has_weight_updates:
+                # Weight-only perturbations (no mask, no added_edges) use the
+                # baseline graph directly and must copy it to avoid mutation.
+                if temp_graph is baseline:
+                    temp_graph = baseline.copy()
+
                 weight_attr = (
                     "syn_count"
                     if "syn_count" in temp_graph.edge_attributes()
                     else "weight"
                 )
                 if weight_attr in temp_graph.edge_attributes():
-                    for baseline_idx, new_weight in weight_updates.items():
-                        if baseline_idx < temp_graph.ecount():
-                            temp_graph.es[baseline_idx][weight_attr] = new_weight
+                    for edge_idx, new_weight in weight_updates.items():
+                        if edge_idx < temp_graph.ecount():
+                            temp_graph.es[edge_idx][weight_attr] = new_weight
 
             # ------------------------------------------------------------------
             # Set weight attributes for added edges

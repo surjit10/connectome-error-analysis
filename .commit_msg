@@ -1,0 +1,12 @@
+Fix edge-weight attribute inconsistency across analysis pipeline
+
+GraphBuilder and error models use the biological edge attribute `syn_count`,
+while several weighted graph analyses only checked for the `weight`
+attribute. Since FlyWire datasets do not create a `weight` edge attribute,
+weighted analyses silently fell back to unweighted computation.
+
+Updated weighted analysis modules to follow the framework convention:
+prefer `syn_count`, fall back to `weight`, then `None`.
+
+This restores correct propagation of edge weights without changing the
+existing architecture or public APIs.

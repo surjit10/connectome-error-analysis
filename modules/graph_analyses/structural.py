@@ -61,8 +61,15 @@ class BasicStructureAnalysis(BaseAnalysis):
         result.metrics["edge_count"] = g.ecount()
 
         # Edge weight statistics
-        if "weight" in g.edge_attributes():
+        # Priority: syn_count (biological name) → weight (igraph convention).
+        if "syn_count" in g.edge_attributes():
+            weights = list(g.es["syn_count"])
+        elif "weight" in g.edge_attributes():
             weights = list(g.es["weight"])
+        else:
+            weights = None
+
+        if weights is not None:
             result.metrics["total_synapses"] = sum(weights)
             w_stats = _weight_summary_stats(weights)
             result.metrics["weight_mean"] = w_stats["mean"]
@@ -78,7 +85,8 @@ class BasicStructureAnalysis(BaseAnalysis):
                         "weight_std", "weight_max", "weight_min"]:
                 result.metrics[key] = 0.0
             result.warnings.append(
-                "Graph has no 'weight' edge attribute; edge weight statistics set to zero."
+                "Graph has no 'syn_count' or 'weight' edge attribute; "
+                "edge weight statistics set to zero."
             )
 
         result.metrics["density"] = g.density()

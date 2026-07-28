@@ -80,7 +80,12 @@ class PageRankAnalysis(BaseAnalysis):
     NAME = "pagerank"
     def _run(self, prepared, config, result):
         g = prepared.graph
-        weights = "weight" if "weight" in g.edge_attributes() else None
+        # Priority: syn_count (biological name) → weight (igraph convention).
+        weights = (
+            "syn_count" if "syn_count" in g.edge_attributes()
+            else "weight" if "weight" in g.edge_attributes()
+            else None
+        )
         damping = config.get("damping", 0.85)
         result.metrics["pagerank_scores"] = g.pagerank(weights=weights, damping=damping)
 

@@ -8,7 +8,12 @@ class CentralityAnalysis(BaseAnalysis):
     NAME = "centrality"
     def _run(self, prepared, config, result):
         g = prepared.graph
-        weights = "weight" if "weight" in g.edge_attributes() else None
+        # Priority: syn_count (biological name) → weight (igraph convention).
+        weights = (
+            "syn_count" if "syn_count" in g.edge_attributes()
+            else "weight" if "weight" in g.edge_attributes()
+            else None
+        )
         
         try:
             result.metrics["betweenness"] = g.betweenness(weights=weights)

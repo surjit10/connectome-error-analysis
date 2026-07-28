@@ -56,8 +56,13 @@ def extract_biological_features(prepared: PreparedGraph) -> EdgeFeatureTable:
     reciprocals = []
     
     # Construct base edge attributes
-    has_weight = "weight" in graph.edge_attributes()
-    edge_weights = graph.es["weight"] if has_weight else [1] * graph.ecount()
+    # Priority: syn_count (biological name) → weight (igraph convention).
+    if "syn_count" in graph.edge_attributes():
+        edge_weights = graph.es["syn_count"]
+    elif "weight" in graph.edge_attributes():
+        edge_weights = graph.es["weight"]
+    else:
+        edge_weights = [1] * graph.ecount()
     
     for e_idx, e in enumerate(graph.es):
         s, t = e.source, e.target

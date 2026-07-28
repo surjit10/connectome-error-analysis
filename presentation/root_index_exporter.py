@@ -29,6 +29,10 @@ _ERROR_MODEL_META: Dict[str, Dict[str, str]] = {
         "display_name": "False Synapses",
         "description":  "Simulates spurious edge insertion from candidate-based false-positive generation.",
     },
+    "synapse_count_measurement": {
+        "display_name": "Synapse Count Measurement",
+        "description":  "Simulates measurement uncertainty in synaptic weight estimation via Gaussian noise.",
+    },
     "false_positive_synapses": {
         "display_name": "False Positive Synapses",
         "description":  "Simulates spurious edge insertion (false-positive connections).",

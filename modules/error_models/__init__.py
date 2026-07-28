@@ -62,3 +62,4 @@ __all__ = [
 # Auto-register standard models
 from . import missed_synapses
 from . import false_synapses
+from . import synapse_count
