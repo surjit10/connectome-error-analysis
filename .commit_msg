@@ -1,8 +1,0 @@
-Fix synapse weight propagation and integer type consistency
-
-- Use the canonical `syn_count` edge attribute throughout weighted analyses.
-- Fix EM3 to preserve integer synapse counts in `weight_updates`.
-- Fix EM2 temporary graph construction to preserve integer `syn_count` values for added edges.
-- Eliminate mixed int/float edge attributes that caused Polars Int64 schema errors during preprocessing.
-- Restore correct propagation of perturbed edge weights into preprocessing and weighted graph analyses.
-- Maintain consistent integer representation of biological synapse counts across GraphBuilder, error models, runner, and analysis pipeline.
