@@ -59,3 +59,4 @@ from . import structural
 from . import network_statistics
 from . import centrality
 from . import biological
+from . import assortativity

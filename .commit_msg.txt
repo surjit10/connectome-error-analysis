@@ -1,0 +1,50 @@
+feat: add lightweight graph analyses, fix imports, normalize FAFB schema, fix presentation metadata
+
+## New Analyses (4 additions)
+- Degree Summary Statistics — extends `DegreeDistributionAnalysis` (mean, median,
+  variance, std, max, min for in/out/total degree; reuses already-computed vectors)
+- Component Size Distribution — extends `ConnectedComponentsAnalysis` (WCC/SCC
+  sorted size lists; reuses already-computed component objects)
+- Assortativity — new `AssortativityAnalysis` (degree_assortativity via
+  `graph.assortativity_degree()`; ~0.01s on BANC)
+- Edge Weight Statistics — extends `BasicStructureAnalysis` (mean, median, variance,
+  std, max, min of edge weights; reuses already-loaded weight vectors)
+
+  Files: modules/graph_analyses/assortativity.py (new)
+         modules/graph_analyses/__init__.py
+         modules/graph_analyses/network_statistics.py
+         modules/graph_analyses/structural.py
+         tests/test_new_analyses.py (new — 14 tests)
+
+## Notebook Updates
+- Fixed stale import in error-1 notebook (`modules.error_models.error_registry`
+  → `modules.error_models`, matching the restructured package layout)
+- Added `"error_model"` metadata key to both error-1 and error-2 notebooks to
+  prevent slug inference from stripping underscores (`"falsesynapses"` → `"false_synapses"`)
+- Added `"assortativity"` to analysis lists in both notebooks (lightweight)
+- Created test notebooks in `notebooks/test_notebook/` for quick 2-trial runs
+
+  Files: notebooks/error-1-flywire-missing-synapse-naming-corrected.ipynb
+         notebooks/error-2-false-synapse.ipynb
+         notebooks/test_notebook/error-1-test-missed-synapses.ipynb (new)
+         notebooks/test_notebook/error-2-test-false-synapses.ipynb (new)
+
+## FAFB Schema Normalization
+- Added `"class": "class_"` to FAFB_MAPPING, making FAFB's `class` column
+  (from classification.csv.gz) use the same canonical name as Princeton datasets
+  (which map `"Class" → "class_"`)
+
+  File: core/data_loader.py
+
+## Presentation Fixes
+- Added `"false_synapses"` entry to `_ERROR_MODEL_META` in RootIndexExporter
+  so the root index page displays "False Synapses" instead of the fallback title
+
+  File: presentation/root_index_exporter.py
+
+## Verification
+- All 98 core framework tests pass (0 regressions)
+- 14 new analysis tests pass
+- Runtime-tested: presentation breadcrumbs resolve correctly for both error models
+- Pre-existing failures: test_demo_dataset_pipeline.py (missing 0-demodata/),
+  test_validation_e2e.py (presentation-layer) — both unrelated

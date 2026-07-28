@@ -92,6 +92,7 @@ FAFB_MAPPING: dict = {
     "nt_type":                   "predicted_nt_type",
     "nt_type_score":             "predicted_nt_confidence",
     "side":                      "soma_side",
+    "class":                     "class_",
     "primary_type":              "primary_cell_type",
     "additional_type(s)":        "alternative_cell_types",
 }

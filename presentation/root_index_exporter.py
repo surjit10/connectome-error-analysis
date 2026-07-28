@@ -25,6 +25,10 @@ _ERROR_MODEL_META: Dict[str, Dict[str, str]] = {
         "display_name": "Missed Synapses",
         "description":  "Simulates topological degradation from false-negative edge removal.",
     },
+    "false_synapses": {
+        "display_name": "False Synapses",
+        "description":  "Simulates spurious edge insertion from candidate-based false-positive generation.",
+    },
     "false_positive_synapses": {
         "display_name": "False Positive Synapses",
         "description":  "Simulates spurious edge insertion (false-positive connections).",
