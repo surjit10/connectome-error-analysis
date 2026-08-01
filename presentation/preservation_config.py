@@ -173,18 +173,22 @@ def calculate_preservation(
     perturbed: float,
     higher_is_better: bool = True,
 ) -> float:
-    """Compute preservation percentage between baseline and perturbed.
+    """Compute symmetric preservation percentage between baseline and perturbed.
 
-    For metrics where **higher is better** (e.g. node count, edge count,
-    SCC size):
+    Deviation in **either** direction reduces preservation.  For metrics
+    where **higher is better** (e.g. node count, edge count, SCC size):
 
-        preservation = (perturbed / baseline) × 100
+        preservation = min(perturbed/baseline, baseline/perturbed) × 100
 
-    For metrics where **lower is better** (e.g. error rate, MSE):
+    A metric that increased by 20% (ratio 1.2) therefore reports
+    ``1/1.2 ≈ 83.3%`` preserved instead of being clamped to 100%.  This is
+    essential for **additive** error models (e.g. false synapses, which add
+    edges): without it, every preservation metric moves *above* baseline and
+    the old ``min(pct, 100.0)`` clamp reports a misleading green "100%".
 
-        preservation = (baseline / perturbed) × 100
-
-    The result is **clamped to 100%** — values above 100 are not allowed.
+    For metrics where **lower is better** (e.g. error rate, MSE) the good
+    direction is reversed: an improvement (perturbed < baseline) stays at
+    100%, while a worsening is penalised by the same ratio.
 
     Args:
         baseline:        Value at 0% error rate.
@@ -204,11 +208,15 @@ def calculate_preservation(
 
     if higher_is_better:
         ratio = perturbed / baseline
+        # Symmetric: an increase is as much a deviation as a decrease.
+        if ratio > 1.0:
+            ratio = 1.0 / ratio
     else:
         ratio = baseline / perturbed
+        # Lower-is-better: improvement → 100%, worsening → ratio (< 1).
+        ratio = min(ratio, 1.0)
 
-    pct = ratio * 100.0
-    return min(pct, 100.0)
+    return ratio * 100.0
 
 
 # -- Status / verdict helpers -----------------------------------------------

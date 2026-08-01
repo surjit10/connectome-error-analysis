@@ -127,7 +127,7 @@ class TrendExporter(BaseExporter):
                 _, bio_label, _ = get_biological_status(preservation)
                 rows.append({
                     "rate":           rate,
-                    "rate_pct":       f"{rate*100:.0f}%",
+                    "rate_pct":       f"{rate*100:g}%",
                     "analysis":       a_name,
                     "metric":         m_name,
                     "baseline_mean":  ev.baseline_mean,
@@ -198,7 +198,7 @@ class TrendExporter(BaseExporter):
 
     def _render_trend_report(self, plot_groups: Dict[str, List[str]]) -> None:
         rates     = self._trend.rates
-        rate_pcts = [f"{r*100:.0f}" for r in rates]
+        rate_pcts = [f"{r*100:g}" for r in rates]
 
         ranking = self._compute_preservation_ranking()
         all_preservations = [p for _, p in ranking]
@@ -243,7 +243,7 @@ class TrendExporter(BaseExporter):
                 "dataset_name":        self._dataset,
                 "error_model_slug":    self._em_slug,
                 "error_model_display": self._em_display,
-                "rates":               [f"{r*100:.0f}" for r in rates],
+                "rates":               [f"{r*100:g}" for r in rates],
                 "n_metrics":           len(all_keys),
                 "min_preservation":    min_preservation,
                 "avg_preservation":    avg_preservation,

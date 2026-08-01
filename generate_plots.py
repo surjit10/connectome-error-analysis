@@ -151,7 +151,7 @@ def main() -> None:
     logger.info(
         "[Phase 1] Loaded %d error rate(s): %s",
         len(results_by_rate),
-        [f"{r*100:.0f}%" for r in sorted(results_by_rate)],
+        [f"{r*100:g}%" for r in sorted(results_by_rate)],
     )
 
     # ── Phase 2: Scientific analysis ─────────────────────────────────

@@ -187,7 +187,7 @@ class TrendPlotter:
                 ax.set_xlabel("Error Rate (%)")
                 ax.set_ylabel("Mean Value")
                 ax.set_xticks(valid_rates)
-                ax.set_xticklabels([f"{r:.0f}%" for r in valid_rates], fontsize=8)
+                ax.set_xticklabels([f"{r:g}%" for r in valid_rates], fontsize=8)
                 ax.legend(fontsize=8, facecolor=_SURFACE, edgecolor=_GRID_COLOR,
                           labelcolor=_TEXT_MUTED)
 
@@ -253,7 +253,7 @@ class TrendPlotter:
             ax.set_ylabel("Preservation (%)")
             ax.set_ylim(0, 105)
             ax.set_xticks(rate_pcts)
-            ax.set_xticklabels([f"{r:.0f}%" for r in rate_pcts], fontsize=8)
+            ax.set_xticklabels([f"{r:g}%" for r in rate_pcts], fontsize=8)
             ax.legend(
                 bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=7,
                 facecolor=_SURFACE, edgecolor=_GRID_COLOR, labelcolor=_TEXT_MUTED,
@@ -282,7 +282,7 @@ class TrendPlotter:
         all_keys = sorted(set().union(*[m.keys() for m in self._trend.metrics_by_rate.values()]))
         # Filter to preservation metrics only for preservation heatmap
         pres_keys = [k for k in all_keys if is_preservation_metric(k)]
-        rate_pcts = [f"{r*100:.0f}%" for r in rates]
+        rate_pcts = [f"{r*100:g}%" for r in rates]
 
         # Build DataFrames (CI data for all metrics, preservation data only for preservation metrics)
         ci_data: Dict[str, list] = {k: [] for k in all_keys}
