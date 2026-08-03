@@ -22,35 +22,44 @@
   </p>
 </div>
 
+{% if error_model_slug == 'synapse_count_measurement' %}
+<div class="callout">
+  ⚗️ <strong>Interpretation note:</strong> This error model perturbs synapse count
+  measurements only. Network topology is unchanged, therefore structural metrics
+  remain preserved while synapse counts may vary.
+</div>
+{% endif %}
+
 <!-- Top stats -->
 <div class="grid-3 mb-2">
+  <div class="stat-box">
+    <div class="stat-metric-name">{{ worst_metric_display }}</div>
+    <div class="stat-value mono">{{ min_preservation }}</div>
+    <div class="stat-label tip" data-tip="Metric with the lowest preservation score across all error rates.">Most Sensitive Metric</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-value mono">{{ avg_preservation }}</div>
+    <div class="stat-label">Average Preservation Score</div>
+  </div>
   <div class="stat-box">
     <div class="stat-value">{{ n_metrics }}</div>
     <div class="stat-label">Metrics Evaluated</div>
   </div>
-  <div class="stat-box">
-    <div class="stat-value mono">{{ min_preservation }}</div>
-    <div class="stat-label">Worst Preservation</div>
-  </div>
-  <div class="stat-box">
-    <div class="stat-value mono">{{ worst_metric }}</div>
-    <div class="stat-label">Most Disrupted Metric</div>
-  </div>
 </div>
 
-<!-- Preservation ranking -->
+<!-- Metric stability ranking -->
 <div class="card">
-  <h2>📋 Biological Preservation Ranking</h2>
+  <h2>📋 Metric Stability Ranking</h2>
   <p class="text-muted mt-1" style="font-size:0.82rem;margin-bottom:0.75rem;">
-    Ranked by minimum preservation across all error rates (worst first).
-    🟢 Preserved ≥99% · 🟡 Minor Impact ≥95% · 🟠 Moderate Impact ≥90% · 🔴 Significant Disruption &lt;90%
+    Ranked by minimum preservation score across all error rates (worst first).
+    🟢 Biologically Preserved ≥99% · 🟡 Minor Impact ≥95% · 🟠 Moderate Impact ≥90% · 🔴 Significant Disruption &lt;90%
   </p>
   <table class="data-table">
     <thead>
       <tr>
         <th>#</th>
         <th>Metric</th>
-        <th>Min Preservation</th>
+        <th class="tip" data-tip="Preservation Score indicates similarity to the baseline network. 100% means no measurable change.">Min Preservation Score</th>
         <th>Biological Status</th>
       </tr>
     </thead>
@@ -59,8 +68,8 @@
       <tr>
         <td class="mono">{{ row.rank }}</td>
         <td class="mono">{{ row.metric_key }}</td>
-        <td class="mono">{{ row.min_preservation }}</td>
-        <td><span class="badge {{ row.bio_css }}">{{ row.biological_status }}</span></td>
+        <td class="mono"><span class="badge {{ row.pres_tier_str }}">{{ row.min_preservation }}</span></td>
+        <td><span class="badge {{ row.bio_css }}">{{ row.biological_status | replace("Preserved", "Biologically Preserved") }}</span></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -135,9 +144,13 @@
 </div>
 {% endif %}
 
-<!-- Preservation table across rates -->
+<!-- Preservation score table across rates -->
 <div class="card">
-  <h2>📋 Preservation Across All Rates</h2>
+  <h2>📋 Preservation Score Across All Rates</h2>
+  <p class="text-muted mt-1" style="font-size:0.82rem;margin-bottom:0.75rem;">
+    Preservation Score (%) indicates similarity to the baseline network — 100% means
+    no measurable change at that error rate.
+  </p>
   <div style="overflow-x:auto">
   <table class="data-table">
     <thead>
@@ -154,7 +167,7 @@
         <td class="mono">{{ row.metric }}</td>
         {% for cell in row.cells %}
         <td class="mono">
-          <span class="badge {{ cell.label | lower }}">{{ cell.value }}</span>
+          <span class="badge {{ cell.pres_tier }}">{{ cell.value }}</span>
         </td>
         {% endfor %}
       </tr>

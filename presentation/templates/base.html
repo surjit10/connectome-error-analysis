@@ -166,6 +166,20 @@
     .badge.minor-structural-impact       { background: #3b2f00; color: #d29922; }
     .badge.moderate-structural-disruption { background: #3d2200; color: #f0883e; }
     .badge.significant-structural-disruption { background: #3d1a1a; color: #f85149; }
+    .badge.biologically-preserved         { background: #0b3d1f; color: #3fb950; }
+    .badge.minor-biological-impact        { background: #3b2f00; color: #d29922; }
+    .badge.moderate-biological-disruption { background: #3d2200; color: #f0883e; }
+    .badge.significant-biological-disruption { background: #3d1a1a; color: #f85149; }
+
+    /* ── Preservation colour tiers (display-only scale) ──
+       Finer visual granularity than the biological status classes so that
+       e.g. 99.3% vs 99.9% are distinguishable.  These are UI colours only;
+       biological classification thresholds are unchanged. */
+    .badge.dark-green  { background: #0d4429; color: #56d364; }
+    .badge.light-green { background: #0f3d2c; color: #7ee787; }
+    .badge.yellow      { background: #3b2f00; color: #d29922; }
+    .badge.orange      { background: #3d2200; color: #f0883e; }
+    .badge.red         { background: #3d1a1a; color: #f85149; }
 
     /* ── Preservation bar ────────────────────────────── */
     .preservation-bar-container {
@@ -189,6 +203,8 @@
     .preservation-bar-fill.yellow { background: #d29922; }
     .preservation-bar-fill.orange { background: #f0883e; }
     .preservation-bar-fill.red   { background: #f85149; }
+    .preservation-bar-fill.dark-green  { background: #2ea043; }
+    .preservation-bar-fill.light-green { background: #56d364; }
 
     /* ── Plot gallery ─────────────────────────────────── */
     .plot-gallery {
@@ -304,6 +320,71 @@
       padding: 0.1rem 0.45rem;
       font-size: 0.75rem;
       color: var(--text-muted);
+    }
+
+    /* ── Tooltip (CSS-only, driven by data-tip) ───────── */
+    .tip {
+      position: relative;
+      cursor: help;
+      border-bottom: 1px dotted var(--text-muted);
+    }
+    .tip::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: 135%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.45rem 0.65rem;
+      font-size: 0.75rem;
+      font-weight: 400;
+      font-family: var(--font);
+      white-space: normal;
+      width: 250px;
+      max-width: 70vw;
+      text-align: center;
+      text-transform: none;
+      letter-spacing: normal;
+      line-height: 1.45;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 20;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    }
+    .tip:hover::after { opacity: 1; }
+
+    /* ── Callout / interpretation note ────────────────── */
+    .callout {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 0.8rem 1rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+    .callout strong { color: var(--text); }
+
+    /* ── Stat-box sub-labels ──────────────────────────── */
+    .stat-box .stat-metric-name {
+      margin-top: 0.15rem;
+      font-size: 1.02rem;
+      font-weight: 600;
+      color: var(--text);
+      font-family: var(--mono);
+      word-break: break-word;
+    }
+    .stat-box .stat-sub {
+      margin-top: 0.15rem;
+      font-size: 0.78rem;
+      color: var(--accent);
+      font-family: var(--mono);
     }
   </style>
   {% block extra_head %}{% endblock %}

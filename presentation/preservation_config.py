@@ -70,7 +70,7 @@ PRESERVATION_THRESHOLDS: List[Tuple[float, float, str, str]] = [
 # (abs_delta_pct_min_inclusive, abs_delta_pct_max_exclusive, label)
 
 CHANGE_INTERPRETATION_THRESHOLDS: List[Tuple[float, float, str]] = [
-    (0.0,  1.0,  "Minimal"),
+    (0.0,  1.0,  "Slight"),
     (1.0,  5.0,  "Minor"),
     (5.0,  10.0, "Moderate"),
     (10.0, 1e9,  "Significant"),
@@ -82,12 +82,12 @@ CHANGE_INTERPRETATION_THRESHOLDS: List[Tuple[float, float, str]] = [
 
 CHANGE_INTERPRETATION_TEMPLATES: Dict[str, Dict[str, str]] = {
     "connected_components.wcc_count": {
-        "increase": "{direction_word} increase in fragmentation ({delta_pct})",
-        "decrease": "{direction_word} decrease in component count ({delta_pct})",
+        "increase": "{direction_word} increase in disconnected components ({delta_pct})",
+        "decrease": "{direction_word} improvement in overall connectivity ({delta_pct})",
     },
     "connected_components.scc_count": {
-        "increase": "{direction_word} increase in strongly connected components ({delta_pct})",
-        "decrease": "{direction_word} decrease in strongly connected components ({delta_pct})",
+        "increase": "{direction_word} increase in network fragmentation ({delta_pct})",
+        "decrease": "{direction_word} reduction in network fragmentation ({delta_pct})",
     },
 }
 
@@ -112,10 +112,10 @@ KEY_INTEGRITY_METRICS: List[str] = [
 # ---------------------------------------------------------------------------
 
 INTEGRITY_THRESHOLDS: List[Tuple[float, float, str, str]] = [
-    (99.0, 100.01, "Structurally Preserved",         "\U0001f7e2"),  # 🟢
-    (95.0, 99.0,   "Minor Structural Impact",         "\U0001f7e1"),  # 🟡
-    (90.0, 95.0,   "Moderate Structural Disruption",  "\U0001f7e0"),  # 🟠
-    (0.0,  90.0,   "Significant Structural Disruption","\U0001f534"),  # 🔴
+    (99.0, 100.01, "Biologically Preserved",           "\U0001f7e2"),  # 🟢
+    (95.0, 99.0,   "Minor Biological Impact",           "\U0001f7e1"),  # 🟡
+    (90.0, 95.0,   "Moderate Biological Disruption",    "\U0001f7e0"),  # 🟠
+    (0.0,  90.0,   "Significant Biological Disruption", "\U0001f534"),  # 🔴
 ]
 
 # ---------------------------------------------------------------------------
@@ -236,7 +236,7 @@ def get_integrity_verdict(integrity_score: float) -> Tuple[str, str, str]:
         if lo <= integrity_score < hi:
             css = _label_to_css(label)
             return emoji, label, css
-    return "\U0001f534", "Significant Structural Disruption", "disruption"
+    return "\U0001f534", "Significant Biological Disruption", "disruption"
 
 
 # -- Change interpretation --------------------------------------------------
@@ -393,6 +393,7 @@ def render_preservation_metric(
         "delta_sign":        delta_sign,
         "preservation":      format_percentage(preservation),
         "preservation_num":  round(preservation, 4),
+        "pres_tier_str":     pres_tier(preservation),
         "bio_status":        bio_label,
         "bio_emoji":         emoji,
         "bio_css":           bio_css,
@@ -479,7 +480,7 @@ def format_change(delta_pct: float, decimals: int = 4) -> str:
 
 
 def format_integrity(value: float) -> str:
-    """Format the overall Network Integrity Score (always 2 decimal places).
+    """Format the overall Biological Preservation Score (always 2 decimal places).
 
     This summary value is kept concise for quick readability.
     """
@@ -500,3 +501,37 @@ def _fmt(value: float) -> str:
     if not math.isfinite(value):
         return "\u2014"
     return f"{value:.6g}"
+
+
+# ===================================================================
+# Display-only colour tier helper (used in templates, not in CSS/gen)
+# ===================================================================
+
+def pres_tier(value: float) -> str:
+    """Map a preservation percentage to a UI colour tier (display only).
+
+    Finer visual granularity than the biological status classes so that
+    e.g. 99.3%% vs 99.9%% are distinguishable.  Classification thresholds
+    used for the biological status labels are untouched.
+
+    Scale:  >=99 dark-green · 97–99 light-green · 95–97 yellow ·
+            90–95 orange · <90 red
+
+    This is a plain Python function (not a Jinja2 filter) so it works
+    across ``extends``-based templates without version-dependent filter
+    scoping issues.  Call it from Python context builders and pass the
+    result as a template variable.
+    """
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return "dark-green"
+    if v >= 99.0:
+        return "dark-green"
+    if v >= 97.0:
+        return "light-green"
+    if v >= 95.0:
+        return "yellow"
+    if v >= 90.0:
+        return "orange"
+    return "red"

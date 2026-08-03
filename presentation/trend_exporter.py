@@ -36,6 +36,8 @@ from presentation.preservation_config import (
     is_preservation_metric,
     higher_is_better,
     KEY_INTEGRITY_METRICS,
+    METRIC_DISPLAY_NAMES,
+    pres_tier,
 )
 
 logger = logging.getLogger(__name__)
@@ -214,7 +216,7 @@ class TrendExporter(BaseExporter):
             for rate in rates:
                 pres = self._preservation_for_rate(rate, key)
                 _, bio_label, _ = get_biological_status(pres)
-                cells.append({"value": f"{pres:.4f}%", "label": bio_label})
+                cells.append({"value": f"{pres:.4f}%", "label": bio_label, "pres_tier": pres_tier(pres)})
             preservation_table_rows.append({"metric": key, "cells": cells})
 
         # Preservation ranking table rows
@@ -222,11 +224,13 @@ class TrendExporter(BaseExporter):
         for rank, (key, min_pres) in enumerate(ranking, start=1):
             _, bio_label, bio_css = get_biological_status(min_pres)
             sensitivity_rows.append({
-                "rank":            rank,
-                "metric_key":      key,
-                "min_preservation": f"{min_pres:.4f}%",
-                "biological_status": bio_label,
-                "bio_css":         bio_css,
+                "rank":                rank,
+                "metric_key":          key,
+                "min_preservation":    f"{min_pres:.4f}%",
+                "min_preservation_num": min_pres,
+                "biological_status":   bio_label,
+                "bio_css":             bio_css,
+                "pres_tier_str":       pres_tier(min_pres),
             })
 
         # Plot lists
@@ -248,6 +252,7 @@ class TrendExporter(BaseExporter):
                 "min_preservation":    min_preservation,
                 "avg_preservation":    avg_preservation,
                 "worst_metric":        worst_metric,
+                "worst_metric_display": METRIC_DISPLAY_NAMES.get(worst_metric, worst_metric),
                 "sensitivity_rows":    sensitivity_rows,
                 "preservation_table_rows": preservation_table_rows,
                 "heatmap_plots":       _to_plot_list(plot_groups.get("heatmaps", [])),
