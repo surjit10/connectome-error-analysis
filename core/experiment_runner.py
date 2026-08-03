@@ -711,6 +711,12 @@ class ExperimentRunner:
                         added_weights_list.append(int(weight))
 
             # Build base temporary graph based on the perturbation type.
+            # baseline_to_subgraph translates baseline edge indices → subgraph
+            # edge indices whenever subgraph_edges() renumbers edges from 0.
+            # It is set only when a subgraph is built; for copy() paths the
+            # index spaces are identical so no translation is needed.
+            baseline_to_subgraph: Optional[Dict[int, int]] = None
+
             if has_mask and not has_added:
                 # Missed-synapse style: subgraph from mask.
                 active_edge_indices = [
@@ -719,9 +725,16 @@ class ExperimentRunner:
                 temp_graph: igraph.Graph = baseline.subgraph_edges(
                     active_edge_indices, delete_vertices=False
                 )
+                # subgraph_edges() renumbers edges 0…N-1; subgraph edge k
+                # corresponds to baseline edge active_edge_indices[k].
+                baseline_to_subgraph = {
+                    b_idx: s_idx
+                    for s_idx, b_idx in enumerate(active_edge_indices)
+                }
 
             elif has_added and not has_mask:
                 # False-synapse style: copy + add_edges.
+                # baseline.copy() preserves all edge indices — no mapping needed.
                 temp_graph = baseline.copy()
                 if added_indices_list:
                     temp_graph.add_edges(added_indices_list)
@@ -734,6 +747,10 @@ class ExperimentRunner:
                 temp_graph = baseline.subgraph_edges(
                     active_edge_indices, delete_vertices=False
                 )
+                baseline_to_subgraph = {
+                    b_idx: s_idx
+                    for s_idx, b_idx in enumerate(active_edge_indices)
+                }
                 if added_indices_list:
                     temp_graph.add_edges(added_indices_list)
 
@@ -758,9 +775,24 @@ class ExperimentRunner:
                     else "weight"
                 )
                 if weight_attr in temp_graph.edge_attributes():
-                    for edge_idx, new_weight in weight_updates.items():
-                        if edge_idx < temp_graph.ecount():
-                            temp_graph.es[edge_idx][weight_attr] = new_weight
+                    for baseline_edge_idx, new_weight in weight_updates.items():
+                        if baseline_to_subgraph is not None:
+                            # Translate baseline edge index → subgraph edge index.
+                            # Edges removed by the mask are absent from the
+                            # mapping; skip them silently.
+                            subgraph_edge_idx = baseline_to_subgraph.get(
+                                baseline_edge_idx
+                            )
+                            if subgraph_edge_idx is None:
+                                continue
+                        else:
+                            # No subgraph was built (copy() path): index spaces
+                            # are identical, so use the baseline index directly.
+                            subgraph_edge_idx = baseline_edge_idx
+                        if subgraph_edge_idx < temp_graph.ecount():
+                            temp_graph.es[subgraph_edge_idx][weight_attr] = (
+                                new_weight
+                            )
 
             # ------------------------------------------------------------------
             # Set weight attributes for added edges
