@@ -1,0 +1,8 @@
+rank,metric,min_preservation,biological_status
+1,basic_structure.edge_count,83.3333,Significant Disruption
+2,basic_structure.density,83.3333,Significant Disruption
+3,basic_structure.total_synapses,90.8889,Moderate Impact
+4,reciprocity.reciprocity,93.3835,Moderate Impact
+5,connected_components.scc_max_size,99.6057,Preserved
+6,basic_structure.node_count,100.0,Preserved
+7,connected_components.wcc_max_size,100.0,Preserved

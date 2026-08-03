@@ -21,14 +21,6 @@
   </p>
 </div>
 
-{% if error_model_slug == 'synapse_count_measurement' %}
-<div class="callout">
-  ⚗️ <strong>Interpretation note:</strong> This error model perturbs synapse count
-  measurements only. Network topology is unchanged, therefore structural metrics
-  remain preserved while synapse counts may vary.
-</div>
-{% endif %}
-
 <!-- Error model summary -->
 <div class="card">
   <h2>📂 Error Model — {{ error_model_display }}</h2>
@@ -41,47 +33,22 @@
   </table>
 </div>
 
-<!-- Overall Biological Verdict Card -->
-<div class="card" style="text-align:center; border-color: var(--accent2);">
-  <h2 style="font-size:1.1rem;">🏁 Overall Biological Verdict</h2>
-  <div style="font-size:3rem; margin-top:0.25rem;">{{ integrity_emoji }}</div>
-  <div style="font-size:1.3rem; font-weight:700; color:var(--accent2);">
-    {{ integrity_verdict }}
-  </div>
-  <div class="text-muted" style="font-size:0.85rem; margin-top:0.6rem; max-width:560px; margin-left:auto; margin-right:auto;">
-    Classification derived from the biological metrics evaluated at this error rate.
-  </div>
-  <div style="margin-top:0.75rem; font-size:0.85rem; color:var(--text-muted); line-height:1.5; max-width:600px; margin-left:auto; margin-right:auto;">
-    {{ biological_assessment }}
-  </div>
+<!-- Experiment Info -->
+<div class="card" style="margin-bottom:0">
+  <h2>ℹ️ Experiment Info</h2>
+  <table class="data-table">
+    <tbody>
+      <tr><td class="text-muted">Dataset</td><td class="mono">{{ dataset_name }}</td></tr>
+      <tr><td class="text-muted">Error Model</td><td class="mono">{{ error_model_display }}</td></tr>
+      <tr><td class="text-muted">Error Rate</td><td class="mono">{{ error_rate_pct }}%</td></tr>
+      <tr><td class="text-muted">Trials</td><td class="mono">{{ n_trials }}</td></tr>
+      <tr><td class="text-muted">Metrics</td><td class="mono">{{ n_metrics }}</td></tr>
+      <tr><td class="text-muted">Generated</td><td class="mono">{{ generated_at }}</td></tr>
+    </tbody>
+  </table>
 </div>
 
-<!-- Metadata sidebar + summary stats -->
-<div class="grid-2 mb-2">
-  <div class="card" style="margin-bottom:0">
-    <h2>ℹ️ Experiment Info</h2>
-    <table class="data-table">
-      <tbody>
-        <tr><td class="text-muted">Dataset</td><td class="mono">{{ dataset_name }}</td></tr>
-        <tr><td class="text-muted">Error Model</td><td class="mono">{{ error_model_display }}</td></tr>
-        <tr><td class="text-muted">Error Rate</td><td class="mono">{{ error_rate_pct }}%</td></tr>
-        <tr><td class="text-muted">Trials</td><td class="mono">{{ n_trials }}</td></tr>
-        <tr><td class="text-muted">Metrics</td><td class="mono">{{ n_metrics }}</td></tr>
-        <tr><td class="text-muted">Generated</td><td class="mono">{{ generated_at }}</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="card" style="margin-bottom:0">
-    <h2>🧬 Biological Verdict</h2>
-    <table class="data-table">
-      <tbody>
-        <tr><td class="text-muted">Verdict</td><td><span class="badge {{ integrity_css }}">{{ integrity_emoji }} {{ integrity_verdict }}</span></td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- Structural Preservation section -->
+<!-- Preservation Scores by Metric -->
 {% if has_preservation %}
 <div class="card">
   <h2>📊 Preservation Scores by Metric</h2>
@@ -101,7 +68,6 @@
         <th>Std</th>
         <th>95% CI</th>
         <th class="tip" data-tip="Preservation Score indicates similarity to the baseline network. 100% means no measurable change.">Preservation Score (%)</th>
-        <th>Status</th>
       </tr>
     </thead>
     <tbody>
@@ -120,12 +86,11 @@
         <td class="mono" style="min-width:120px;">
           <div class="preservation-bar-container">
             <div class="preservation-bar-bg">
-              <div class="preservation-bar-fill {{ row.pres_tier_str }}" style="width:{{ row.preservation }}%"></div>
+              <div class="preservation-bar-fill" style="width:{{ row.preservation }}%"></div>
             </div>
-            <span class="badge {{ row.pres_tier_str }}">{{ row.preservation }}%</span>
+            <span class="mono">{{ row.preservation }}%</span>
           </div>
         </td>
-        <td><span class="badge {{ row.bio_css }}">{{ row.bio_emoji }} {{ row.bio_status | replace("Preserved", "Biologically Preserved") }}</span></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -134,7 +99,7 @@
 </div>
 {% endif %}
 
-<!-- Structural Change Indicators section -->
+<!-- Structural Change Indicators -->
 {% if has_change %}
 <div class="card">
   <h2>📊 Structural Change Indicators</h2>
@@ -152,7 +117,6 @@
         <th>Δ%</th>
         <th>Std</th>
         <th>95% CI</th>
-        <th>Interpretation</th>
       </tr>
     </thead>
     <tbody>
@@ -168,9 +132,6 @@
         <td class="mono">
           [{{ row.ci_lower }}, {{ row.ci_upper }}]
         </td>
-        <td class="mono" style="color:var(--text-muted); font-size:0.78rem;">
-          {{ row.interpretation }}
-        </td>
       </tr>
       {% endfor %}
     </tbody>
@@ -178,18 +139,6 @@
   </div>
 </div>
 {% endif %}
-
-<!-- Overall Verdict -->
-<div class="card">
-  <h2>🏁 Overall Biological Verdict</h2>
-  <div style="text-align:center; padding:1rem;">
-    <div style="font-size:3rem;">{{ integrity_emoji }}</div>
-    <div style="font-size:1.3rem; font-weight:600; margin-top:0.5rem;">{{ integrity_verdict }}</div>
-  </div>
-  <p class="interpretation-text" style="text-align:center; max-width:700px; margin:0 auto;">
-    {{ biological_assessment }}
-  </p>
-</div>
 
 <!-- Plot gallery: distributions -->
 {% if dist_plots %}
@@ -239,15 +188,5 @@
     <li><a href="../summary.html"><span>📄</span><span>Dataset Summary</span></a></li>
     <li><a href="data/metrics.json"><span>📄</span><span>metrics.json (raw data)</span></a></li>
   </ul>
-</div>
-
-<!-- Scientific interpretation -->
-<div class="card">
-  <h2>🧠 Scientific Interpretation</h2>
-  <p class="interpretation-text">
-    {{ biological_assessment }}
-    Confidence intervals and across-trial standard deviations indicate the
-    reproducibility of these observations.
-  </p>
 </div>
 {% endblock %}

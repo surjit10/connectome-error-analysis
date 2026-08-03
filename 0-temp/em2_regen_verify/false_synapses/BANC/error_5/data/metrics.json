@@ -1,0 +1,352 @@
+{
+  "basic_structure": {
+    "node_count": {
+      "baseline_mean": 158262.0,
+      "mean": 158262.0,
+      "std": 0.0,
+      "ci_lower": 158262.0,
+      "ci_upper": 158262.0,
+      "metric_type": "preservation",
+      "preservation_pct": 100.0,
+      "biological_status": "Preserved"
+    },
+    "edge_count": {
+      "baseline_mean": 3990039.0,
+      "mean": 4189541.0,
+      "std": 0.0,
+      "ci_lower": 4189541.0,
+      "ci_upper": 4189541.0,
+      "metric_type": "preservation",
+      "preservation_pct": 95.2381,
+      "biological_status": "Minor Impact"
+    },
+    "total_synapses": {
+      "baseline_mean": 23556214.0,
+      "mean": 24146488.6,
+      "std": 332.5406742039235,
+      "ci_lower": 24146197.1152473,
+      "ci_upper": 24146780.0847527,
+      "metric_type": "preservation",
+      "preservation_pct": 97.5554,
+      "biological_status": "Minor Impact"
+    },
+    "weight_mean": {
+      "baseline_mean": 5.903755326702321,
+      "mean": 5.763516480683683,
+      "std": 7.937401118755279e-05,
+      "ci_lower": 5.763446906295296,
+      "ci_upper": 5.763586055072071,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "weight_median": {
+      "baseline_mean": 4.0,
+      "mean": 4.0,
+      "std": 0.0,
+      "ci_lower": 4.0,
+      "ci_upper": 4.0,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "weight_variance": {
+      "baseline_mean": 89.45748753848277,
+      "mean": 85.66422803408375,
+      "std": 0.0005101681364841276,
+      "ci_lower": 85.66378085199555,
+      "ci_upper": 85.66467521617194,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "weight_std": {
+      "baseline_mean": 9.45819684392764,
+      "mean": 9.255497179162019,
+      "std": 2.7560261206423316e-05,
+      "ci_lower": 9.255473021527944,
+      "ci_upper": 9.255521336796093,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "weight_max": {
+      "baseline_mean": 913.0,
+      "mean": 913.0,
+      "std": 0.0,
+      "ci_lower": 913.0,
+      "ci_upper": 913.0,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "weight_min": {
+      "baseline_mean": 1.0,
+      "mean": 1.0,
+      "std": 0.0,
+      "ci_lower": 1.0,
+      "ci_upper": 1.0,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "density": {
+      "baseline_mean": 0.00015930396501487044,
+      "mean": 0.00016726916526188474,
+      "std": 0.0,
+      "ci_lower": 0.00016726916526188474,
+      "ci_upper": 0.00016726916526188474,
+      "metric_type": "preservation",
+      "preservation_pct": 95.2381,
+      "biological_status": "Minor Impact"
+    }
+  },
+  "degree_distribution": {
+    "in_degree_mean": {
+      "baseline_mean": 25.21160480721841,
+      "mean": 26.47218536351114,
+      "std": 0.0,
+      "ci_lower": 26.47218536351114,
+      "ci_upper": 26.47218536351114,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "in_degree_median": {
+      "baseline_mean": 9.0,
+      "mean": 10.0,
+      "std": 0.0,
+      "ci_lower": 10.0,
+      "ci_upper": 10.0,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "in_degree_variance": {
+      "baseline_mean": 3727.29660036276,
+      "mean": 3791.135104194122,
+      "std": 0.24891688698536135,
+      "ci_lower": 3790.9169189227437,
+      "ci_upper": 3791.3532894655004,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "in_degree_std": {
+      "baseline_mean": 61.05158966286431,
+      "mean": 61.5721942188638,
+      "std": 0.0020213355015763035,
+      "ci_lower": 61.57042244017775,
+      "ci_upper": 61.57396599754985,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "in_degree_max": {
+      "baseline_mean": 4707.0,
+      "mean": 4707.0,
+      "std": 0.0,
+      "ci_lower": 4707.0,
+      "ci_upper": 4707.0,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "in_degree_min": {
+      "baseline_mean": 0.0,
+      "mean": 0.0,
+      "std": 0.0,
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "out_degree_mean": {
+      "baseline_mean": 25.21160480721841,
+      "mean": 26.47218536351114,
+      "std": 0.0,
+      "ci_lower": 26.47218536351114,
+      "ci_upper": 26.47218536351114,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "out_degree_median": {
+      "baseline_mean": 11.0,
+      "mean": 12.0,
+      "std": 0.0,
+      "ci_lower": 12.0,
+      "ci_upper": 12.0,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "out_degree_variance": {
+      "baseline_mean": 3364.863849607683,
+      "mean": 3464.7720985452615,
+      "std": 0.4057339530322611,
+      "ci_lower": 3464.4164570549556,
+      "ci_upper": 3465.1277400355675,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "out_degree_std": {
+      "baseline_mean": 58.007446501356036,
+      "mean": 58.862314676224685,
+      "std": 0.00344644115826837,
+      "ci_lower": 58.85929373735423,
+      "ci_upper": 58.86533561509514,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "out_degree_max": {
+      "baseline_mean": 4782.0,
+      "mean": 4782.0,
+      "std": 0.0,
+      "ci_lower": 4782.0,
+      "ci_upper": 4782.0,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "out_degree_min": {
+      "baseline_mean": 0.0,
+      "mean": 0.0,
+      "std": 0.0,
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "total_degree_mean": {
+      "baseline_mean": 50.42320961443682,
+      "mean": 52.94437072702228,
+      "std": 0.0,
+      "ci_lower": 52.94437072702228,
+      "ci_upper": 52.94437072702228,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "total_degree_median": {
+      "baseline_mean": 21.0,
+      "mean": 22.0,
+      "std": 0.0,
+      "ci_lower": 22.0,
+      "ci_upper": 22.0,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "total_degree_variance": {
+      "baseline_mean": 12481.215315530224,
+      "mean": 12711.356645561667,
+      "std": 0.7902458897536677,
+      "ci_lower": 12710.663964498523,
+      "ci_upper": 12712.049326624812,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "total_degree_std": {
+      "baseline_mean": 111.71935962728317,
+      "mean": 112.74465235981776,
+      "std": 0.0035045512693874814,
+      "ci_lower": 112.74158048518912,
+      "ci_upper": 112.74772423444641,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "total_degree_max": {
+      "baseline_mean": 9489.0,
+      "mean": 9489.0,
+      "std": 0.0,
+      "ci_lower": 9489.0,
+      "ci_upper": 9489.0,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "total_degree_min": {
+      "baseline_mean": 0.0,
+      "mean": 0.0,
+      "std": 0.0,
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    }
+  },
+  "assortativity": {
+    "degree_assortativity": {
+      "baseline_mean": -0.046430186922204346,
+      "mean": -0.04097434270770219,
+      "std": 8.215250166449051e-06,
+      "ci_lower": -0.04098154369196934,
+      "ci_upper": -0.04096714172343505,
+      "metric_type": "similarity",
+      "preservation_pct": null,
+      "biological_status": null
+    }
+  },
+  "connected_components": {
+    "wcc_count": {
+      "baseline_mean": 4306.0,
+      "mean": 4306.0,
+      "std": 0.0,
+      "ci_lower": 4306.0,
+      "ci_upper": 4306.0,
+      "metric_type": "change",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "wcc_max_size": {
+      "baseline_mean": 153952.0,
+      "mean": 153952.0,
+      "std": 0.0,
+      "ci_lower": 153952.0,
+      "ci_upper": 153952.0,
+      "metric_type": "preservation",
+      "preservation_pct": 100.0,
+      "biological_status": "Preserved"
+    },
+    "scc_count": {
+      "baseline_mean": 18345.0,
+      "mean": 18300.0,
+      "std": 5.0990195135927845,
+      "ci_lower": 18295.53051233361,
+      "ci_upper": 18304.46948766639,
+      "metric_type": "change",
+      "preservation_pct": null,
+      "biological_status": null
+    },
+    "scc_max_size": {
+      "baseline_mean": 139405.0,
+      "mean": 139453.2,
+      "std": 6.457553716385176,
+      "ci_lower": 139447.53970460137,
+      "ci_upper": 139458.86029539866,
+      "metric_type": "preservation",
+      "preservation_pct": 99.9654,
+      "biological_status": "Preserved"
+    }
+  },
+  "reciprocity": {
+    "reciprocity": {
+      "baseline_mean": 0.12993908079595212,
+      "mean": 0.13117857063578087,
+      "std": 1.5575298679327547e-05,
+      "ci_lower": 0.13116491828454707,
+      "ci_upper": 0.13119222298701466,
+      "metric_type": "preservation",
+      "preservation_pct": 99.0551,
+      "biological_status": "Preserved"
+    }
+  }
+}

@@ -296,77 +296,6 @@ def get_change_interpretation(
     )
 
 
-# -- Biological assessment --------------------------------------------------
-
-def generate_biological_assessment(
-    integrity_score: float,
-    metrics_preservation: Dict[str, float],
-) -> str:
-    """Generate a short, data-consistent assessment paragraph.
-
-    Every sentence is derived from the per-metric preservation values that
-    are actually present in the report, so the narrative always agrees with
-    the tables shown below it.  The ``integrity_score`` argument is retained
-    only for backward compatibility and is not used to fabricate statements
-    that contradict the metric-level data.
-
-    Args:
-        integrity_score:  Average preservation across key metrics (unused in
-                          the text; kept for API compatibility).
-        metrics_preservation:
-            ``{full_metric_key: preservation_pct}`` for all available metrics.
-
-    Returns:
-        A natural-language string summarising the biological state.
-    """
-    if not metrics_preservation:
-        return "Per-metric preservation scores are reported in the tables below."
-
-    parts: List[str] = []
-
-    def _avg(keys: Tuple[str, ...]) -> float:
-        vals = [metrics_preservation[k] for k in keys if k in metrics_preservation]
-        return sum(vals) / len(vals) if vals else 100.0
-
-    # Category-level aggregation from the metric values actually reported
-    topo = _avg(("basic_structure.node_count", "basic_structure.edge_count", "basic_structure.density"))
-    syn  = _avg(("basic_structure.total_synapses", "basic_structure.weight_mean",
-                 "basic_structure.weight_median", "basic_structure.weight_variance",
-                 "basic_structure.weight_std", "basic_structure.weight_max",
-                 "basic_structure.weight_min"))
-    conn = _avg(("connected_components.scc_max_size", "connected_components.wcc_max_size"))
-    org  = _avg(("reciprocity.reciprocity", "assortativity.degree_assortativity"))
-
-    if topo >= 99.0:
-        parts.append("Global network topology remains preserved.")
-    elif topo < 95.0:
-        parts.append("Global network topology shows measurable structural changes.")
-
-    if syn >= 99.0:
-        parts.append("Synapse-related properties remain preserved.")
-    elif syn >= 95.0:
-        parts.append("Synapse-related properties show minor changes.")
-    elif syn < 90.0:
-        parts.append("Synapse-related properties exhibit significant degradation.")
-    else:
-        parts.append("Synapse-related properties exhibit measurable degradation.")
-
-    if conn >= 99.0:
-        parts.append("Large-scale connectivity remains stable.")
-    elif conn < 95.0:
-        parts.append("Large-scale connectivity is measurably affected.")
-
-    if org >= 99.0:
-        parts.append("Network organisation is preserved.")
-    elif org < 95.0:
-        parts.append("Network organisation shows measurable changes.")
-
-    if not parts:
-        parts.append("Per-metric preservation scores are reported in the tables below.")
-
-    return " ".join(parts)
-
-
 # ===================================================================
 # Render helpers  (return dicts ready for template consumption)
 # ===================================================================
@@ -382,10 +311,11 @@ def render_preservation_metric(
     ci_lower: float,
     ci_upper: float,
 ) -> Dict:
-    """Build a row dict for a **preservation** metric with progress bar + badge.
+    """Build a purely numerical row dict for a **preservation** metric.
 
-    Returns a dict ready for the HTML template, including preservation %,
-    biological status, emoji, and CSS class.
+    Returns only measured values (baseline / perturbed / Δ% / preservation % /
+    std / 95% CI).  No status labels, emojis, or threshold classifications —
+    the report is intended to be interpreted by the reviewer.
     """
     display_name = METRIC_DISPLAY_NAMES.get(key, metric)
 
@@ -397,26 +327,21 @@ def render_preservation_metric(
         baseline_mean, perturbed_mean,
         higher_is_better=higher_is_better(key),
     )
-    emoji, bio_label, bio_css = get_biological_status(preservation)
 
     return {
-        "metric_type":       "preservation",
-        "analysis":          analysis,
-        "metric":            metric,
-        "display_name":      display_name,
-        "baseline_mean":     _fmt(baseline_mean),
-        "mean":              _fmt(perturbed_mean),
-        "std":               _fmt(std),
-        "ci_lower":          _fmt(ci_lower),
-        "ci_upper":          _fmt(ci_upper),
-        "delta_pct":         delta_pct,
-        "delta_sign":        delta_sign,
-        "preservation":      format_percentage(preservation),
-        "preservation_num":  round(preservation, 4),
-        "pres_tier_str":     pres_tier(preservation),
-        "bio_status":        bio_label,
-        "bio_emoji":         emoji,
-        "bio_css":           bio_css,
+        "metric_type":      "preservation",
+        "analysis":         analysis,
+        "metric":           metric,
+        "display_name":     display_name,
+        "baseline_mean":    _fmt(baseline_mean),
+        "mean":             _fmt(perturbed_mean),
+        "std":              _fmt(std),
+        "ci_lower":         _fmt(ci_lower),
+        "ci_upper":         _fmt(ci_upper),
+        "delta_pct":        delta_pct,
+        "delta_sign":       delta_sign,
+        "preservation":     format_percentage(preservation),
+        "preservation_num": round(preservation, 4),
     }
 
 
@@ -430,43 +355,27 @@ def render_change_metric(
     ci_lower: float,
     ci_upper: float,
 ) -> Dict:
-    """Build a row dict for a **change** metric with interpretation, no preservation.
+    """Build a purely numerical row dict for a **change** metric.
 
-    Returns a dict ready for the HTML template, with an ``interpretation`` field
-    instead of preservation / bio_status / bio_emoji / bio_css.
+    Reports the measured change (Δ% and direction) without any interpretation
+    text — reviewers interpret the magnitude themselves.
     """
     display_name = METRIC_DISPLAY_NAMES.get(key, metric)
 
     delta_pct, delta_sign = _pct_change(perturbed_mean, baseline_mean)
 
-    # Parse numeric delta for interpretation
-    try:
-        raw_delta = (perturbed_mean - baseline_mean) / abs(baseline_mean) * 100 \
-            if baseline_mean != 0 and math.isfinite(baseline_mean) and math.isfinite(perturbed_mean) else 0.0
-    except (ZeroDivisionError, ValueError):
-        raw_delta = 0.0
-    is_increase = raw_delta > 0
-
-    interpretation = get_change_interpretation(key, raw_delta, is_increase)
-
     return {
-        "metric_type":     "change",
-        "analysis":        analysis,
-        "metric":          metric,
-        "display_name":    display_name,
-        "baseline_mean":   _fmt(baseline_mean),
-        "mean":            _fmt(perturbed_mean),
-        "std":             _fmt(std),
-        "ci_lower":        _fmt(ci_lower),
-        "ci_upper":        _fmt(ci_upper),
-        "delta_pct":       delta_pct,
-        "delta_sign":      delta_sign,
-        "interpretation":  interpretation,
-        # Still pass preservation fields (will be ignored in template)
-        "preservation":    "—",
-        "bio_status":      "",
-        "bio_emoji":       "",
-        "bio_css":         "",
+        "metric_type":   "change",
+        "analysis":      analysis,
+        "metric":        metric,
+        "display_name":  display_name,
+        "baseline_mean": _fmt(baseline_mean),
+        "mean":          _fmt(perturbed_mean),
+        "std":           _fmt(std),
+        "ci_lower":      _fmt(ci_lower),
+        "ci_upper":      _fmt(ci_upper),
+        "delta_pct":     delta_pct,
+        "delta_sign":    delta_sign,
     }
 
 
@@ -480,9 +389,6 @@ def format_percentage(value: float, decimals: int = 4) -> str:
 
     Metric-level percentages default to **4 decimal places** to avoid hiding
     very small structural changes after rounding.
-
-    The overall Network Integrity Score uses ``format_integrity()`` (2 decimals)
-    instead.
     """
     return f"{value:.{decimals}f}"
 
@@ -497,14 +403,6 @@ def format_change(delta_pct: float, decimals: int = 4) -> str:
         return "\u2014"
     sign = "+" if delta_pct >= 0 else ""
     return f"{sign}{delta_pct:.{decimals}f}%"
-
-
-def format_integrity(value: float) -> str:
-    """Format the overall Biological Preservation Score (always 2 decimal places).
-
-    This summary value is kept concise for quick readability.
-    """
-    return f"{value:.2f}"
 
 
 def _pct_change(mean: float, baseline: float, decimals: int = 4) -> Tuple[str, str]:
@@ -638,33 +536,3 @@ def error_model_summary(slug: str) -> Dict[str, str]:
         "expected_structural_effect": "See per-metric results.",
         "expected_analysis_effect": "See per-metric results.",
     })
-
-
-def pres_tier(value: float) -> str:
-    """Map a preservation percentage to a UI colour tier (display only).
-
-    Finer visual granularity than the biological status classes so that
-    e.g. 99.3%% vs 99.9%% are distinguishable.  Classification thresholds
-    used for the biological status labels are untouched.
-
-    Scale:  >=99 dark-green · 97–99 light-green · 95–97 yellow ·
-            90–95 orange · <90 red
-
-    This is a plain Python function (not a Jinja2 filter) so it works
-    across ``extends``-based templates without version-dependent filter
-    scoping issues.  Call it from Python context builders and pass the
-    result as a template variable.
-    """
-    try:
-        v = float(value)
-    except (TypeError, ValueError):
-        return "dark-green"
-    if v >= 99.0:
-        return "dark-green"
-    if v >= 97.0:
-        return "light-green"
-    if v >= 95.0:
-        return "yellow"
-    if v >= 90.0:
-        return "orange"
-    return "red"

@@ -35,9 +35,6 @@ from presentation.preservation_config import (
     get_biological_status,
     is_preservation_metric,
     higher_is_better,
-    KEY_INTEGRITY_METRICS,
-    METRIC_DISPLAY_NAMES,
-    pres_tier,
     error_model_summary,
 )
 
@@ -203,36 +200,16 @@ class TrendExporter(BaseExporter):
         rates     = self._trend.rates
         rate_pcts = [f"{r*100:g}" for r in rates]
 
+        # Preservation table rows (metric × rate) — purely numerical.
         ranking = self._compute_preservation_ranking()
-        all_preservations = [p for _, p in ranking]
-        min_preservation = f"{min(all_preservations):.4f}%" if all_preservations else "100.0000%"
-        avg_preservation = f"{sum(all_preservations)/len(all_preservations):.4f}%" if all_preservations else "100.0000%"
-        worst_metric = ranking[0][0] if ranking else "—"
-
-        # Preservation table rows (metric × rate)
         all_keys = [k for k, _ in ranking]
         preservation_table_rows = []
         for key in all_keys:
             cells = []
             for rate in rates:
                 pres = self._preservation_for_rate(rate, key)
-                _, bio_label, _ = get_biological_status(pres)
-                cells.append({"value": f"{pres:.4f}%", "label": bio_label, "pres_tier": pres_tier(pres)})
+                cells.append({"value": f"{pres:.4f}%"})
             preservation_table_rows.append({"metric": key, "cells": cells})
-
-        # Preservation ranking table rows
-        sensitivity_rows = []
-        for rank, (key, min_pres) in enumerate(ranking, start=1):
-            _, bio_label, bio_css = get_biological_status(min_pres)
-            sensitivity_rows.append({
-                "rank":                rank,
-                "metric_key":          key,
-                "min_preservation":    f"{min_pres:.4f}%",
-                "min_preservation_num": min_pres,
-                "biological_status":   bio_label,
-                "bio_css":             bio_css,
-                "pres_tier_str":       pres_tier(min_pres),
-            })
 
         # Plot lists
         def _to_plot_list(filenames: List[str], prefix: str = "") -> List[Dict]:
@@ -250,11 +227,6 @@ class TrendExporter(BaseExporter):
                 "error_model_display": self._em_display,
                 "rates":               [f"{r*100:g}" for r in rates],
                 "n_metrics":           len(all_keys),
-                "min_preservation":    min_preservation,
-                "avg_preservation":    avg_preservation,
-                "worst_metric":        worst_metric,
-                "worst_metric_display": METRIC_DISPLAY_NAMES.get(worst_metric, worst_metric),
-                "sensitivity_rows":    sensitivity_rows,
                 "preservation_table_rows": preservation_table_rows,
                 "em_summary":          error_model_summary(self._em_slug),
                 "heatmap_plots":       _to_plot_list(plot_groups.get("heatmaps", [])),

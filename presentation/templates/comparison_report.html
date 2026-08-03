@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Error Model Comparison — {{ dataset_name }}{% endblock %}
+
+{% block breadcrumb %}
+<a href="{{ root_path }}index.html">Index</a>
+<span class="sep">/</span>
+<span>{{ dataset_name }} — Comparison</span>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Error Model Comparison — {{ dataset_name }}</h1>
+  <p class="subtitle">
+    Side-by-side comparison of Missed Synapses, False Synapses and Synapse Count
+    Measurement on the same dataset. Values are read from the existing exported
+    results — no new statistics are computed.
+  </p>
+</div>
+
+<!-- Summary comparison table -->
+<div class="card">
+  <h2>📊 Model Comparison Overview</h2>
+  <div style="overflow-x:auto;">
+    <table class="data-table comparison-table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          {% for m in models %}
+          <th>{{ m.display }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="text-muted">Metrics Evaluated</td>
+          {% for m in models %}
+          <td class="mono">{{ m.n_metrics }}</td>
+          {% endfor %}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Per-model cards -->
+{% for m in models %}
+<div class="card">
+  <h2>📂 {{ m.display }}</h2>
+  <p class="text-muted mt-1" style="font-size:0.85rem; margin-bottom:0.75rem;">
+    {{ m.description }}
+  </p>
+  <ul class="link-list" style="margin-top:0.75rem;">
+    <li><a href="../{{ m.slug }}/summary.html">
+      <span>📄</span><span>Full Report — {{ m.display }}</span>
+    </a></li>
+  </ul>
+</div>
+{% endfor %}
+{% endblock %}

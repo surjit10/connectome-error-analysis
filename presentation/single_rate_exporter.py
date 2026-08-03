@@ -23,7 +23,7 @@ from __future__ import annotations
 import logging
 import math
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 from modules.statistical_evaluation.evaluator import (
     MetricEvaluation,
@@ -35,12 +35,9 @@ from presentation.preservation_config import (
     get_metric_type,
     calculate_preservation,
     get_biological_status,
-    get_integrity_verdict,
-    generate_biological_assessment,
     is_preservation_metric,
     is_change_metric,
     higher_is_better,
-    KEY_INTEGRITY_METRICS,
     METRIC_DISPLAY_NAMES,
     render_preservation_metric,
     render_change_metric,
@@ -227,21 +224,6 @@ class SingleRateExporter(BaseExporter):
                     ))
         return pres_rows, chg_rows
 
-    def _compute_integrity(self, preservation_rows: List[Dict]) -> Tuple[float, List[Dict]]:
-        """Compute overall network integrity score from key preservation metrics.
-
-        Returns:
-            Tuple of ``(integrity_score, key_metric_rows)``.
-        """
-        key_rows = [
-            r for r in preservation_rows
-            if f"{r['analysis']}.{r['metric']}" in KEY_INTEGRITY_METRICS
-        ]
-        if not key_rows:
-            return 100.0, []
-        integrity = sum(r["preservation_num"] for r in key_rows) / len(key_rows)
-        return round(integrity, 4), key_rows
-
     def _render_report(
         self,
         rate_pct:     str,
@@ -252,18 +234,6 @@ class SingleRateExporter(BaseExporter):
 
         # Build metric rows (separated by type)
         preservation_rows, change_rows = self._compute_metric_rows()
-
-        # Compute overall integrity (only from preservation metrics)
-        integrity_score, key_metric_rows = self._compute_integrity(preservation_rows)
-        integrity_emoji, integrity_verdict, integrity_css = get_integrity_verdict(integrity_score)
-
-        # Collect per-metric preservation dict for assessment text
-        preservation_dict: Dict[str, float] = {}
-        for r in preservation_rows:
-            key = f"{r['analysis']}.{r['metric']}"
-            preservation_dict[key] = r["preservation_num"]
-
-        assessment = generate_biological_assessment(integrity_score, preservation_dict)
 
         n_preservation = len(preservation_rows)
         n_change = len(change_rows)
@@ -297,11 +267,6 @@ class SingleRateExporter(BaseExporter):
                 "change_rows":         change_rows,
                 "has_preservation":    n_preservation > 0,
                 "has_change":          n_change > 0,
-                # Verdict only — the aggregated score is no longer displayed.
-                "integrity_emoji":     integrity_emoji,
-                "integrity_verdict":   integrity_verdict,
-                "integrity_css":       integrity_css,
-                "biological_assessment": assessment,
                 "em_summary":          error_model_summary(self._em_slug),
                 "dist_plots":          [{"filename": f, "label": f.replace(".png","").replace("distribution_","")} for f in dist_files],
                 "struct_plots":        [{"filename": f, "label": f.replace(".png","")} for f in struct_files],
