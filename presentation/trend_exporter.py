@@ -38,6 +38,7 @@ from presentation.preservation_config import (
     KEY_INTEGRITY_METRICS,
     METRIC_DISPLAY_NAMES,
     pres_tier,
+    error_model_summary,
 )
 
 logger = logging.getLogger(__name__)
@@ -255,6 +256,7 @@ class TrendExporter(BaseExporter):
                 "worst_metric_display": METRIC_DISPLAY_NAMES.get(worst_metric, worst_metric),
                 "sensitivity_rows":    sensitivity_rows,
                 "preservation_table_rows": preservation_table_rows,
+                "em_summary":          error_model_summary(self._em_slug),
                 "heatmap_plots":       _to_plot_list(plot_groups.get("heatmaps", [])),
                 "global_summary_plots": _to_plot_list(plot_groups.get("global_summaries", [])),
                 "ranking_plots":       _to_plot_list(plot_groups.get("rankings", [])),

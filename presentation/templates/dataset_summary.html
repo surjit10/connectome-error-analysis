@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ dataset_name }} — {{ error_model_display }} Summary{% endblock %}
+{% block title %}{{ dataset_name }} — {{ error_model_display }} — Scientific Report{% endblock %}
 
 {% block breadcrumb %}
 <a href="{{ root_path }}index.html">Index</a>
@@ -12,10 +12,13 @@
 
 {% block content %}
 <div class="page-header">
-  <h1>{{ dataset_name }} — {{ error_model_display }}</h1>
+  <h1>Scientific Report — {{ dataset_name }}</h1>
   <p class="subtitle">
-    {{ n_rates }} error rate(s) &middot; {{ total_trials }} trial(s) &middot;
-    {{ n_metrics }} metric(s) evaluated
+    {{ error_model_display }} &middot; {{ n_rates }} error rate(s) &middot;
+    {{ total_trials }} trial(s) &middot; {{ n_metrics }} metric(s) evaluated
+    {% if has_comparison %}
+    &middot; <a href="../comparison/index.html" style="color:var(--accent)">Compare error models</a>
+    {% endif %}
   </p>
 </div>
 
@@ -27,94 +30,454 @@
 </div>
 {% endif %}
 
-<!-- Overall Biological Preservation Score Card -->
-<div class="card" style="text-align:center; border-color: var(--accent2);">
-  <h2 style="font-size:1.1rem;">🧬 Overall Biological Preservation Score</h2>
-  <div style="font-size:2.8rem; font-weight:700; color:var(--accent2); font-family:var(--mono);">
-    {{ integrity_score }}
-  </div>
-  <div style="font-size:1rem; margin-top:0.25rem;">
-    <span style="font-size:1.3rem;">{{ integrity_emoji }}</span>
-    <span class="badge {{ integrity_css }}" style="font-size:0.85rem;">{{ integrity_verdict }}</span>
-  </div>
-  <div class="text-muted" style="font-size:0.85rem; margin-top:0.6rem; max-width:560px; margin-left:auto; margin-right:auto;">
-    Weighted preservation score computed from the biological metrics evaluated in this report.
-  </div>
+<!-- ═══════════════ Table of Contents ═══════════════ -->
+<div class="card toc">
+  <h2>Table of Contents</h2>
+  <ol class="toc-list">
+    <li><a href="#sec-exec">Executive Summary</a></li>
+    <li><a href="#sec-info">Experiment Information</a></li>
+    <li><a href="#sec-verdict">Overall Biological Verdict</a></li>
+    <li><a href="#sec-findings">Key Findings</a></li>
+    <li><a href="#sec-structural">Structural Preservation Analysis</a></li>
+    <li><a href="#sec-similarity">Network Similarity Analysis</a></li>
+    <li><a href="#sec-reliability">Statistical Reliability</a></li>
+    <li><a href="#sec-trend">Trend Analysis</a></li>
+    <li><a href="#sec-rates">Error Rate Results</a></li>
+    <li><a href="#sec-appendix">Appendix</a></li>
+  </ol>
 </div>
 
-<!-- Stat row -->
-<div class="grid-2 mb-2">
-  <div class="stat-box">
-    <div class="stat-metric-name">{{ worst_metric_display }}</div>
-    <div class="stat-value mono">{{ worst_preservation }}</div>
-    <div class="stat-label tip" data-tip="Metric with the lowest preservation score across all perturbed error rates.">Most Sensitive Metric</div>
+<!-- ═══════════════ 1. Executive Summary ═══════════════ -->
+<section id="sec-exec" class="report-section">
+  <h2 class="section-title"><span class="section-no">1</span> Executive Summary</h2>
+  <div class="card exec-card">
+    <div class="exec-grid">
+      <div class="exec-verdict">
+        <div class="exec-label">Overall Biological Verdict</div>
+        <div class="exec-value">
+          <span class="badge {{ exec.integrity_css }}">{{ exec.integrity_emoji }} {{ exec.integrity_verdict }}</span>
+        </div>
+      </div>
+      <div class="exec-facts">
+        <table class="data-table">
+          <tbody>
+            <tr><td class="text-muted">Dataset</td><td class="mono">{{ exec.dataset_name }}</td></tr>
+            <tr><td class="text-muted">Error Model</td><td class="mono">{{ exec.error_model_display }}</td></tr>
+            <tr><td class="text-muted">Error Rates</td><td class="mono">{{ exec.n_rates }}</td></tr>
+            <tr><td class="text-muted">Trials</td><td class="mono">{{ exec.total_trials }}</td></tr>
+            <tr><td class="text-muted">Metrics Evaluated</td><td class="mono">{{ exec.n_metrics }}</td></tr>
+            <tr><td class="text-muted">Most Sensitive Metric</td><td class="mono">{{ exec.worst_metric_display }} ({{ exec.worst_preservation }})</td></tr>
+            <tr><td class="text-muted">Most Stable Metric</td><td class="mono">{{ exec.best_metric_display }} ({{ exec.best_preservation }})</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="exec-interpretation">
+      <strong>Biological Interpretation:</strong>
+      <ul class="findings-list">
+        {% for s in interpretations.exec %}
+        <li><span class="finding-dot">▸</span> {{ s }}</li>
+        {% endfor %}
+      </ul>
+    </div>
   </div>
-  <div class="stat-box">
-    <div class="stat-value">{{ n_metrics }}</div>
-    <div class="stat-label">Metrics Evaluated</div>
+</section>
+
+<!-- ═══════════════ 2. Experiment Information ═══════════════ -->
+<section id="sec-info" class="report-section">
+  <h2 class="section-title"><span class="section-no">2</span> Experiment Information</h2>
+  <div class="card">
+    <table class="data-table">
+      <tbody>
+        <tr><td class="text-muted">Dataset</td><td class="mono">{{ dataset_name }}</td></tr>
+        <tr><td class="text-muted">Error Model</td><td class="mono">{{ error_model_display }}</td></tr>
+        <tr><td class="text-muted">Error Rates Tested</td><td class="mono">{% for r in rates %}{{ r.label }}%{% if not loop.last %}, {% endif %}{% endfor %}</td></tr>
+        <tr><td class="text-muted">Total Trials</td><td class="mono">{{ total_trials }}</td></tr>
+        <tr><td class="text-muted">Metrics Evaluated</td><td class="mono">{{ n_metrics }}</td></tr>
+        <tr><td class="text-muted">Generated</td><td class="mono">{{ generated_at }}</td></tr>
+        <tr><td class="text-muted">Pipeline Version</td><td class="mono">FlyWire reporting pipeline</td></tr>
+      </tbody>
+    </table>
+    <!-- TODO: Replace the hard-coded pipeline label above with a real version
+         string once the backend exposes a pipeline version (none is currently
+         available in metadata.json). -->
+    <!-- TODO: Add total wall-clock runtime here once the backend exposes an
+         aggregated experiment runtime (currently only per-trial runtime is
+         available in data/metadata.json). -->
   </div>
-</div>
+</section>
 
-<!-- Error rate navigation -->
-<div class="card">
-  <h2>📁 Experiments by Error Rate</h2>
-  <ul class="link-list">
-    {% for rate in rates %}
-    <li>
-      <a href="error_{{ rate.label }}/report.html">
-        <span>🔍</span>
-        <span>Error {{ rate.label }}%</span>
-        <span class="tag">{{ rate.n_trials }} trial(s)</span>
-        {% if rate.n_disrupted > 0 %}
-        <span class="badge significant-disruption">{{ rate.n_disrupted }} / {{ n_metrics }} disrupted</span>
-        {% endif %}
-      </a>
-    </li>
-    {% endfor %}
-  </ul>
-</div>
+<!-- ═══════════════ 3. Overall Biological Verdict ═══════════════ -->
+<section id="sec-verdict" class="report-section">
+  <h2 class="section-title"><span class="section-no">3</span> Overall Biological Verdict</h2>
+  <div class="card" style="text-align:center; border-color: var(--accent2);">
+    <div style="font-size:3rem;">{{ exec.integrity_emoji }}</div>
+    <div style="font-size:1.6rem; font-weight:700; color:var(--accent2);">
+      {{ exec.integrity_verdict }}
+    </div>
+    <div class="text-muted" style="font-size:0.85rem; margin-top:0.6rem; max-width:560px; margin-left:auto; margin-right:auto;">
+      Classification derived from the biological metrics evaluated in this
+      report. Per-metric evidence is given in the tables below.
+    </div>
+  </div>
 
-<!-- Trend analysis -->
-<div class="card">
-  <h2>📈 Trend Analysis</h2>
-  <p class="text-muted mt-1" style="font-size:0.85rem;margin-bottom:0.75rem;">
-    Aggregated results across all error rates including preservation progression,
-    metric response curves, biological status ranking, and correlation matrices.
-  </p>
-  <ul class="link-list">
-    <li><a href="trend_analysis/trend_report.html">
-      <span>📊</span><span>Open Trend Report</span>
-    </a></li>
-  </ul>
-</div>
+  <div class="grid-2 mb-2">
+    <div class="stat-box">
+      <div class="stat-metric-name">{{ exec.worst_metric_display }}</div>
+      <div class="stat-value mono">{{ exec.worst_preservation }}</div>
+      <div class="stat-label tip" data-tip="Metric with the lowest preservation score across all perturbed error rates.">Most Sensitive Metric</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-metric-name">{{ exec.best_metric_display }}</div>
+      <div class="stat-value mono">{{ exec.best_preservation }}</div>
+      <div class="stat-label tip" data-tip="Metric with the highest preservation score across all perturbed error rates (excluding invariant metrics that never change).">Most Stable Metric</div>
+    </div>
+  </div>
 
-<!-- Preservation ranking preview -->
-{% if sensitivity_rows %}
-<div class="card">
-  <h2>📋 Metric Stability Ranking</h2>
-  <p class="text-muted mt-1" style="font-size:0.82rem;margin-bottom:0.75rem;">
-    🟢 Biologically Preserved ≥99% · 🟡 Minor Impact ≥95% · 🟠 Moderate Impact ≥90% · 🔴 Significant Disruption &lt;90%
-  </p>
-  <table class="data-table">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Metric</th>
-        <th class="tip" data-tip="Preservation Score indicates similarity to the baseline network. 100% means no measurable change.">Min Preservation Score</th>
-        <th>Biological Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for row in sensitivity_rows %}
-      <tr>
-        <td class="mono">{{ row.rank }}</td>
-        <td class="mono">{{ row.metric_key }}</td>
-        <td class="mono"><span class="badge {{ row.pres_tier_str }}">{{ row.min_preservation }}</span></td>
-        <td><span class="badge {{ row.bio_css }}">{{ row.biological_status | replace("Preserved", "Biologically Preserved") }}</span></td>
-      </tr>
+  <div class="card">
+    <h2>📋 Metric Stability Ranking</h2>
+    <p class="text-muted mt-1" style="font-size:0.82rem;margin-bottom:0.75rem;">
+      🟢 Biologically Preserved ≥99% · 🟡 Minor Impact ≥95% · 🟠 Moderate Impact ≥90% · 🔴 Significant Disruption &lt;90%
+    </p>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Metric</th>
+          <th class="tip" data-tip="Preservation Score indicates similarity to the baseline network. 100% means no measurable change.">Min Preservation Score</th>
+          <th>Biological Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in sensitivity_rows %}
+        <tr>
+          <td class="mono">{{ row.rank }}</td>
+          <td class="mono">{{ row.metric_key }}</td>
+          <td class="mono"><span class="badge {{ row.pres_tier_str }}">{{ row.min_preservation }}</span></td>
+          <td><span class="badge {{ row.bio_css }}">{{ row.biological_status | replace("Preserved", "Biologically Preserved") }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>📊 Biological Category Summary</h2>
+    <p class="text-muted mt-1" style="font-size:0.82rem;margin-bottom:0.75rem;">
+      Mean minimum preservation across the metrics of each biological family.
+    </p>
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Biological Family</th>
+            <th>Status</th>
+            <th>Avg Min Preservation</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in category_summary %}
+          <tr>
+            <td class="mono">{{ c.category }}</td>
+            <td><span class="badge {{ 'dark-green' if c.avg_preservation >= 99 else ('yellow' if c.avg_preservation >= 95 else ('orange' if c.avg_preservation >= 90 else 'red')) }}">{{ c.emoji }} {{ c.status }}</span></td>
+            <td class="mono">{{ c.avg_str }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="text-muted">No category data available.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ 4. Key Findings ═══════════════ -->
+<section id="sec-findings" class="report-section">
+  <h2 class="section-title"><span class="section-no">4</span> Key Findings</h2>
+  <div class="card">
+    <ul class="findings-list">
+      {% for finding in key_findings %}
+      <li><span class="finding-dot">▸</span> {{ finding }}</li>
+      {% else %}
+      <li class="text-muted">No key findings available.</li>
       {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
+    </ul>
+  </div>
+  <div class="card">
+    <h2>🧠 Scientific Interpretation</h2>
+    <p class="interpretation-text">
+      {% for s in interpretations.exec %}{{ s }} {% endfor %}
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════ 5. Structural Preservation Analysis ═══════════════ -->
+<section id="sec-structural" class="report-section">
+  <h2 class="section-title"><span class="section-no">5</span> Structural Preservation Analysis</h2>
+  <p class="section-intro">
+    Preservation Score (%) measures similarity to the baseline (0% error rate) network —
+    100% means no measurable change. Metrics are grouped by biological family.
+  </p>
+  {% for group in grouped_structural %}
+  <div class="card">
+    <h2>📂 {{ group.category }}</h2>
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th class="tip" data-tip="Preservation Score indicates similarity to the baseline network. 100% means no measurable change.">Min Preservation Score</th>
+            <th>Biological Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in group.rows %}
+          <tr>
+            <td class="mono">{{ row.display }}</td>
+            <td class="mono"><span class="badge {{ row.tier }}">{{ row.min_preservation }}</span></td>
+            <td><span class="badge {{ row.bio_css }}">{{ row.bio_emoji }} {{ row.bio_label | replace("Preserved", "Biologically Preserved") }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="card">
+    <p class="text-muted">No preservation metrics available for this error model.</p>
+  </div>
+  {% endfor %}
+  <div class="card">
+    <h2>🧠 Scientific Interpretation</h2>
+    <p class="interpretation-text">
+      {% for s in interpretations.structural %}{{ s }} {% endfor %}
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════ 6. Network Similarity Analysis ═══════════════ -->
+<section id="sec-similarity" class="report-section">
+  <h2 class="section-title"><span class="section-no">6</span> Network Similarity Analysis</h2>
+  <div class="card">
+    <p class="text-muted mt-1" style="font-size:0.85rem;margin-bottom:0.75rem;">
+      These metrics quantify whether the relative importance of neurons remains
+      preserved after perturbation. Only derived similarity statistics are shown —
+      raw per-node vectors are never exposed.
+    </p>
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Similarity Metric</th>
+            <th>Worst-Rate Value</th>
+          {% if network_similarity and network_similarity[0].rate_cells %}
+            {% for v in network_similarity[0].rate_cells %}
+            <th>{{ v.rate_pct }}%</th>
+            {% endfor %}
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in network_similarity %}
+          <tr>
+            <td class="mono">{{ row.display }}</td>
+            <td class="mono">{{ row.worst_value }}</td>
+            {% for v in row.rate_cells %}
+            <td class="mono">{{ v.value }}</td>
+            {% endfor %}
+          </tr>
+          {% else %}
+          <tr><td colspan="2" class="text-muted">No similarity metrics available (vector analyses not enabled).</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <h2>🧠 Scientific Interpretation</h2>
+    <p class="interpretation-text">
+      {% for s in interpretations.similarity %}{{ s }} {% endfor %}
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════ 7. Statistical Reliability ═══════════════ -->
+<section id="sec-reliability" class="report-section">
+  <h2 class="section-title"><span class="section-no">7</span> Statistical Reliability</h2>
+  <div class="card">
+    <p class="text-muted mt-1" style="font-size:0.85rem;margin-bottom:0.75rem;">
+      Across-trial variability for each metric: mean standard deviation and mean
+      95% confidence-interval width across all error rates.
+    </p>
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th>Avg Std</th>
+            <th>Avg 95% CI Width</th>
+            <th>Rates</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in reliability_rows %}
+          <tr>
+            <td class="mono">{{ row.display }}</td>
+            <td class="mono">{{ row.avg_std }}</td>
+            <td class="mono">{{ row.avg_ci_width }}</td>
+            <td class="mono">{{ row.n_rates }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-muted">No reliability data available.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <h2>🧠 Scientific Interpretation</h2>
+    <p class="interpretation-text">
+      {% for s in interpretations.reliability %}{{ s }} {% endfor %}
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════ 8. Trend Analysis ═══════════════ -->
+<section id="sec-trend" class="report-section">
+  <h2 class="section-title"><span class="section-no">8</span> Trend Analysis</h2>
+  <div class="card">
+    <h2>📈 Mean Preservation Across Error Rates</h2>
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Rate</th>
+            {% for cell in overall_by_rate %}
+            <th>{{ cell.rate_pct }}%</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="text-muted">Mean Preservation</td>
+            {% for cell in overall_by_rate %}
+            <td class="mono">{{ cell.value }}</td>
+            {% endfor %}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📊 Key Metric Response Curves</h2>
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            {% if trend_overview_rows and trend_overview_rows[0].cells %}
+            {% for cell in trend_overview_rows[0].cells %}
+            <th>{{ cell.rate_pct }}%</th>
+            {% endfor %}
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in trend_overview_rows %}
+          <tr>
+            <td class="mono">{{ row.display }}</td>
+            {% for cell in row.cells %}
+            <td class="mono"><span class="badge {{ cell.tier }}">{{ cell.value }}</span></td>
+            {% endfor %}
+          </tr>
+          {% else %}
+          <tr><td colspan="2" class="text-muted">No trend data available.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📊 Full Trend Report</h2>
+    <p class="text-muted mt-1" style="font-size:0.85rem;margin-bottom:0.75rem;">
+      Preservation progression, metric response curves, biological status ranking,
+      heatmaps, and correlation matrices.
+    </p>
+    <ul class="link-list">
+      <li><a href="trend_analysis/trend_report.html">
+        <span>📊</span><span>Open Trend Report</span>
+      </a></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>🧠 Scientific Interpretation</h2>
+    <p class="interpretation-text">
+      {% for s in interpretations.trend %}{{ s }} {% endfor %}
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════ 9. Error Rate Results ═══════════════ -->
+<section id="sec-rates" class="report-section">
+  <h2 class="section-title"><span class="section-no">9</span> Error Rate Results</h2>
+  <div class="card">
+    <ul class="link-list">
+      {% for rate in rates %}
+      <li>
+        <a href="error_{{ rate.label }}/report.html">
+          <span>🔍</span>
+          <span>Error {{ rate.label }}%</span>
+          <span class="tag">{{ rate.n_trials }} trial(s)</span>
+          {% if rate.n_disrupted > 0 %}
+          <span class="badge significant-disruption">{{ rate.n_disrupted }} / {{ n_metrics }} disrupted</span>
+          {% endif %}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════════ 10. Appendix ═══════════════ -->
+<section id="sec-appendix" class="report-section">
+  <h2 class="section-title"><span class="section-no">10</span> Appendix</h2>
+  <div class="card">
+    <h2>📂 Error Model Description</h2>
+    <table class="data-table">
+      <tbody>
+        <tr><td class="text-muted">Biological Effect</td><td>{{ em_summary.biological_effect }}</td></tr>
+        <tr><td class="text-muted">Expected Structural Effect</td><td>{{ em_summary.expected_structural_effect }}</td></tr>
+        <tr><td class="text-muted">Expected Analysis Effect</td><td>{{ em_summary.expected_analysis_effect }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2>📄 Raw Data &amp; Downloads</h2>
+    <ul class="link-list">
+      <li><a href="trend_analysis/combined_results.csv"><span>📄</span><span>combined_results.csv (all metrics × rates)</span></a></li>
+      <li><a href="trend_analysis/combined_statistics.csv"><span>📄</span><span>combined_statistics.csv (preservation ranking)</span></a></li>
+      <li><a href="error_0/data/metrics.json"><span>📄</span><span>Per-rate metrics.json in each error_*/data/ folder</span></a></li>
+    </ul>
+  </div>
+  <div class="card">
+    <h2>⚠️ Metrics Not Included</h2>
+    <p class="text-muted mt-1" style="font-size:0.85rem;line-height:1.6;">
+      The following analyses are intentionally omitted from this report:
+    </p>
+    <ul class="findings-list">
+      <li><span class="finding-dot">▸</span> <strong>Betweenness &amp; Closeness Centrality</strong> — disabled for computational cost (O(V·E) on the full connectome).</li>
+      <li><span class="finding-dot">▸</span> <strong>Community Detection</strong> — no implementation registered in the framework.</li>
+      <li><span class="finding-dot">▸</span> <strong>Conserved Circuits &amp; Neuron Matching</strong> — framework stubs for future integration.</li>
+    </ul>
+    <p class="text-muted mt-1" style="font-size:0.82rem;">
+      The Network Similarity section therefore contains only PageRank and
+      degree-distribution derived statistics, which are computed from the
+      enabled analyses.
+    </p>
+  </div>
+</section>
 {% endblock %}

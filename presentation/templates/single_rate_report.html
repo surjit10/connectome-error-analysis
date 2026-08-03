@@ -29,18 +29,27 @@
 </div>
 {% endif %}
 
-<!-- Overall Biological Preservation Score Card -->
+<!-- Error model summary -->
+<div class="card">
+  <h2>📂 Error Model — {{ error_model_display }}</h2>
+  <table class="data-table">
+    <tbody>
+      <tr><td class="text-muted">Biological Effect</td><td>{{ em_summary.biological_effect }}</td></tr>
+      <tr><td class="text-muted">Expected Structural Effect</td><td>{{ em_summary.expected_structural_effect }}</td></tr>
+      <tr><td class="text-muted">Expected Analysis Effect</td><td>{{ em_summary.expected_analysis_effect }}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Overall Biological Verdict Card -->
 <div class="card" style="text-align:center; border-color: var(--accent2);">
-  <h2 style="font-size:1.1rem;">🧬 Overall Biological Preservation Score</h2>
-  <div style="font-size:2.8rem; font-weight:700; color:var(--accent2); font-family:var(--mono);">
-    {{ integrity_score }}%
+  <h2 style="font-size:1.1rem;">🏁 Overall Biological Verdict</h2>
+  <div style="font-size:3rem; margin-top:0.25rem;">{{ integrity_emoji }}</div>
+  <div style="font-size:1.3rem; font-weight:700; color:var(--accent2);">
+    {{ integrity_verdict }}
   </div>
-  <div style="font-size:1rem; margin-top:0.25rem;">
-    <span style="font-size:1.3rem;">{{ integrity_emoji }}</span>
-    <span class="badge {{ integrity_css }}" style="font-size:0.85rem;">{{ integrity_verdict }}</span>
-  </div>
-  <div class="text-muted" style="font-size:0.85rem; margin-top:0.6rem;">
-    Weighted preservation score computed from the biological metrics evaluated in this report.
+  <div class="text-muted" style="font-size:0.85rem; margin-top:0.6rem; max-width:560px; margin-left:auto; margin-right:auto;">
+    Classification derived from the biological metrics evaluated at this error rate.
   </div>
   <div style="margin-top:0.75rem; font-size:0.85rem; color:var(--text-muted); line-height:1.5; max-width:600px; margin-left:auto; margin-right:auto;">
     {{ biological_assessment }}
@@ -63,10 +72,9 @@
     </table>
   </div>
   <div class="card" style="margin-bottom:0">
-    <h2>🧬 Biological Preservation</h2>
+    <h2>🧬 Biological Verdict</h2>
     <table class="data-table">
       <tbody>
-        <tr><td class="text-muted">Preservation Score</td><td class="mono">{{ integrity_score }}%</td></tr>
         <tr><td class="text-muted">Verdict</td><td><span class="badge {{ integrity_css }}">{{ integrity_emoji }} {{ integrity_verdict }}</span></td></tr>
       </tbody>
     </table>
@@ -177,8 +185,10 @@
   <div style="text-align:center; padding:1rem;">
     <div style="font-size:3rem;">{{ integrity_emoji }}</div>
     <div style="font-size:1.3rem; font-weight:600; margin-top:0.5rem;">{{ integrity_verdict }}</div>
-    <div style="font-size:0.9rem; color:var(--text-muted); margin-top:0.5rem;">Preservation Score: {{ integrity_score }}%</div>
   </div>
+  <p class="interpretation-text" style="text-align:center; max-width:700px; margin:0 auto;">
+    {{ biological_assessment }}
+  </p>
 </div>
 
 <!-- Plot gallery: distributions -->
@@ -229,5 +239,15 @@
     <li><a href="../summary.html"><span>📄</span><span>Dataset Summary</span></a></li>
     <li><a href="data/metrics.json"><span>📄</span><span>metrics.json (raw data)</span></a></li>
   </ul>
+</div>
+
+<!-- Scientific interpretation -->
+<div class="card">
+  <h2>🧠 Scientific Interpretation</h2>
+  <p class="interpretation-text">
+    {{ biological_assessment }}
+    Confidence intervals and across-trial standard deviations indicate the
+    reproducibility of these observations.
+  </p>
 </div>
 {% endblock %}

@@ -35,6 +35,16 @@ from presentation.preservation_config import (
     format_integrity,
     METRIC_DISPLAY_NAMES,
     pres_tier,
+    error_model_summary,
+)
+from presentation.model_summary import (
+    build_executive_summary,
+    build_key_findings,
+    build_grouped_structural,
+    build_network_similarity,
+    build_reliability,
+    build_category_summary,
+    build_interpretations,
 )
 
 logger = logging.getLogger(__name__)
@@ -174,6 +184,10 @@ class DatasetExporter(BaseExporter):
                     return round(sum(preservations) / len(preservations), 2)
         return 100.0
 
+    def render_summary(self) -> None:
+        """Re-render just the dataset summary.html (used after comparison export)."""
+        self._render_summary(sorted(self._results.keys()))
+
     def _render_summary(self, sorted_rates: List[float]) -> None:
         n_metrics    = len(self._sensitivity.summaries)
         total_trials = sum(r.n_trials for r in self._results.values())
@@ -228,6 +242,87 @@ class DatasetExporter(BaseExporter):
                 "pres_tier_str":       pres_tier(min_pres),
             })
 
+        # ── Scientific-report blocks (presentation only) ──────────────
+        exec_summary = build_executive_summary(
+            dataset_name=self._dataset,
+            error_model_slug=self._em_slug,
+            error_model_display=self._em_display,
+            n_rates=len(sorted_rates),
+            total_trials=total_trials,
+            n_metrics=n_metrics,
+            trend=self._trend,
+            integrity_score=integrity_score,
+        )
+        key_findings    = build_key_findings(self._trend, exec_summary)
+        grouped_struct  = build_grouped_structural(self._trend)
+        network_similarity = build_network_similarity(self._trend)
+        reliability_rows = build_reliability(self._trend)
+
+        # Trend overview: key metric preservation × each error rate
+        trend_overview_metrics = [
+            "basic_structure.edge_count",
+            "basic_structure.total_synapses",
+            "connected_components.scc_max_size",
+            "connected_components.wcc_max_size",
+            "reciprocity.reciprocity",
+        ]
+        trend_overview_rows = []
+        for key in trend_overview_metrics:
+            cells = []
+            for rate in sorted_rates:
+                ev = self._trend.metrics_by_rate.get(rate, {}).get(key)
+                if ev is None or not is_preservation_metric(key):
+                    continue
+                pres = calculate_preservation(
+                    ev.baseline_mean, ev.mean,
+                    higher_is_better=higher_is_better(key),
+                )
+                cells.append({
+                    "rate_pct": f"{rate*100:g}",
+                    "value":    f"{pres:.2f}%",
+                    "tier":     pres_tier(pres),
+                })
+            if cells:
+                trend_overview_rows.append({
+                    "metric_key": key,
+                    "display":    METRIC_DISPLAY_NAMES.get(key, key.split(".")[-1]),
+                    "cells":      cells,
+                })
+
+        # Overall preservation per rate (average across preservation metrics)
+        overall_by_rate = []
+        for rate in sorted_rates:
+            pres_list = []
+            for key, ev in self._trend.metrics_by_rate.get(rate, {}).items():
+                if not is_preservation_metric(key):
+                    continue
+                pres_list.append(calculate_preservation(
+                    ev.baseline_mean, ev.mean,
+                    higher_is_better=higher_is_better(key),
+                ))
+            if pres_list:
+                overall_by_rate.append({
+                    "rate_pct": f"{rate*100:g}",
+                    "value":    f"{sum(pres_list)/len(pres_list):.2f}%",
+                    "value_num": sum(pres_list)/len(pres_list),
+                })
+
+        # ── Presentation-only: category summary + rule-based interpretation ─
+        category_summary = build_category_summary(self._trend)
+        interpretations  = build_interpretations(
+            self._trend, category_summary,
+            network_similarity, reliability_rows, overall_by_rate,
+        )
+
+        em_summary = error_model_summary(self._em_slug)
+
+        # Only show the comparison link when the comparison page exists (it is
+        # generated separately by ComparisonExporter, e.g. from the regen
+        # script, so it may be absent on a single-model notebook run).
+        has_comparison = (
+            self.output_dir.parent / "comparison" / "index.html"
+        ).exists()
+
         root_path = self._rel_root(self.output_dir, self._root)
 
         self._render_template(
@@ -239,7 +334,7 @@ class DatasetExporter(BaseExporter):
                 "n_rates":             len(sorted_rates),
                 "total_trials":        total_trials,
                 "n_metrics":           n_metrics,
-                "integrity_score":     f"{format_integrity(integrity_score)}%",
+                # Verdict only — the aggregated score is no longer displayed.
                 "integrity_emoji":     integrity_emoji,
                 "integrity_verdict":   integrity_verdict,
                 "integrity_css":       integrity_css,
@@ -248,6 +343,18 @@ class DatasetExporter(BaseExporter):
                 "worst_metric_display": METRIC_DISPLAY_NAMES.get(worst_metric, worst_metric),
                 "rates":               rates_info,
                 "sensitivity_rows":    sensitivity_rows,
+                # Scientific-report blocks
+                "exec":                exec_summary,
+                "key_findings":        key_findings,
+                "grouped_structural":  grouped_struct,
+                "category_summary":    category_summary,
+                "interpretations":     interpretations,
+                "network_similarity":  network_similarity,
+                "reliability_rows":    reliability_rows,
+                "trend_overview_rows": trend_overview_rows,
+                "overall_by_rate":     overall_by_rate,
+                "em_summary":          em_summary,
+                "has_comparison":      has_comparison,
                 "root_path":           root_path,
             },
             self.output_dir / "summary.html",

@@ -45,7 +45,7 @@ from presentation.preservation_config import (
     render_preservation_metric,
     render_change_metric,
     _pct_change,
-    format_integrity,
+    error_model_summary,
 )
 
 logger = logging.getLogger(__name__)
@@ -297,11 +297,12 @@ class SingleRateExporter(BaseExporter):
                 "change_rows":         change_rows,
                 "has_preservation":    n_preservation > 0,
                 "has_change":          n_change > 0,
-                "integrity_score":     format_integrity(integrity_score),
+                # Verdict only — the aggregated score is no longer displayed.
                 "integrity_emoji":     integrity_emoji,
                 "integrity_verdict":   integrity_verdict,
                 "integrity_css":       integrity_css,
                 "biological_assessment": assessment,
+                "em_summary":          error_model_summary(self._em_slug),
                 "dist_plots":          [{"filename": f, "label": f.replace(".png","").replace("distribution_","")} for f in dist_files],
                 "struct_plots":        [{"filename": f, "label": f.replace(".png","")} for f in struct_files],
                 "prev_rate_url":       prev_url,

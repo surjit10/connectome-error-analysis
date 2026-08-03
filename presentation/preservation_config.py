@@ -11,7 +11,7 @@ can be easily modified without hunting through the codebase.
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 # ---------------------------------------------------------------------------
 # Metric type classification
@@ -106,6 +106,22 @@ KEY_INTEGRITY_METRICS: List[str] = [
     "connected_components.scc_max_size",
     "reciprocity.reciprocity",
 ]
+
+# ---------------------------------------------------------------------------
+# Invariant metrics — excluded from "Most Stable Metric" selection
+# ---------------------------------------------------------------------------
+# These metrics cannot change under any of the implemented error models
+# (EM1/EM2/EM3 never add or remove neurons), so reporting them as the
+# "most stable" metric is not scientifically informative.
+
+INVARIANT_METRICS: List[str] = [
+    "basic_structure.node_count",
+]
+
+
+def is_invariant_metric(key: str) -> bool:
+    """Return True for metrics that can never change under any error model."""
+    return key in INVARIANT_METRICS
 
 # ---------------------------------------------------------------------------
 # Integrity thresholds for the overall verdict
@@ -286,63 +302,67 @@ def generate_biological_assessment(
     integrity_score: float,
     metrics_preservation: Dict[str, float],
 ) -> str:
-    """Generate a short human-readable assessment paragraph.
+    """Generate a short, data-consistent assessment paragraph.
+
+    Every sentence is derived from the per-metric preservation values that
+    are actually present in the report, so the narrative always agrees with
+    the tables shown below it.  The ``integrity_score`` argument is retained
+    only for backward compatibility and is not used to fabricate statements
+    that contradict the metric-level data.
 
     Args:
-        integrity_score:  Average preservation across key metrics.
+        integrity_score:  Average preservation across key metrics (unused in
+                          the text; kept for API compatibility).
         metrics_preservation:
             ``{full_metric_key: preservation_pct}`` for all available metrics.
 
     Returns:
         A natural-language string summarising the biological state.
     """
-    emoji, verdict, _ = get_integrity_verdict(integrity_score)
+    if not metrics_preservation:
+        return "Per-metric preservation scores are reported in the tables below."
 
     parts: List[str] = []
-    if integrity_score >= 99.0:
-        parts.append(
-            "The simulated errors preserve nearly all global structural "
-            "properties of the network."
-        )
-        parts.append("No measurable biological degradation is observed.")
-    elif integrity_score >= 95.0:
-        parts.append(
-            "The simulated errors have a minor impact on global network "
-            "structure."
-        )
-        parts.append("Most biological properties remain intact.")
-    elif integrity_score >= 90.0:
-        parts.append(
-            "The simulated errors cause moderate disruption to network "
-            "structure."
-        )
-        parts.append("Several biological properties show measurable degradation.")
-    else:
-        parts.append(
-            "The simulated errors cause significant disruption to network "
-            "structure."
-        )
-        parts.append(
-            "Critical biological properties are substantially degraded."
-        )
 
-    # Add specific observations for well-known metrics
-    if "basic_structure.node_count" in metrics_preservation:
-        v = metrics_preservation["basic_structure.node_count"]
-        if v >= 99.0 and integrity_score >= 99.0:
-            parts.append("Connectivity remains stable.")
-    if "reciprocity.reciprocity" in metrics_preservation:
-        v = metrics_preservation["reciprocity.reciprocity"]
-        if v >= 99.0:
-            parts.append("Reciprocal connectivity is preserved.")
-        elif v < 95.0:
-            parts.append("Reciprocal connectivity is degraded.")
-    if "connected_components.wcc_max_size" in metrics_preservation:
-        v = metrics_preservation["connected_components.wcc_max_size"]
-        if v >= 99.0:
-            parts.append("The largest connected component remains intact.")
-        elif v < 95.0:
-            parts.append("The largest connected component is fragmenting.")
+    def _avg(keys: Tuple[str, ...]) -> float:
+        vals = [metrics_preservation[k] for k in keys if k in metrics_preservation]
+        return sum(vals) / len(vals) if vals else 100.0
+
+    # Category-level aggregation from the metric values actually reported
+    topo = _avg(("basic_structure.node_count", "basic_structure.edge_count", "basic_structure.density"))
+    syn  = _avg(("basic_structure.total_synapses", "basic_structure.weight_mean",
+                 "basic_structure.weight_median", "basic_structure.weight_variance",
+                 "basic_structure.weight_std", "basic_structure.weight_max",
+                 "basic_structure.weight_min"))
+    conn = _avg(("connected_components.scc_max_size", "connected_components.wcc_max_size"))
+    org  = _avg(("reciprocity.reciprocity", "assortativity.degree_assortativity"))
+
+    if topo >= 99.0:
+        parts.append("Global network topology remains preserved.")
+    elif topo < 95.0:
+        parts.append("Global network topology shows measurable structural changes.")
+
+    if syn >= 99.0:
+        parts.append("Synapse-related properties remain preserved.")
+    elif syn >= 95.0:
+        parts.append("Synapse-related properties show minor changes.")
+    elif syn < 90.0:
+        parts.append("Synapse-related properties exhibit significant degradation.")
+    else:
+        parts.append("Synapse-related properties exhibit measurable degradation.")
+
+    if conn >= 99.0:
+        parts.append("Large-scale connectivity remains stable.")
+    elif conn < 95.0:
+        parts.append("Large-scale connectivity is measurably affected.")
+
+    if org >= 99.0:
+        parts.append("Network organisation is preserved.")
+    elif org < 95.0:
+        parts.append("Network organisation shows measurable changes.")
+
+    if not parts:
+        parts.append("Per-metric preservation scores are reported in the tables below.")
 
     return " ".join(parts)
 
@@ -506,6 +526,119 @@ def _fmt(value: float) -> str:
 # ===================================================================
 # Display-only colour tier helper (used in templates, not in CSS/gen)
 # ===================================================================
+
+# ===================================================================
+# Scientific-report display groupings  (presentation only)
+# -------------------------------------------------------------------
+# These maps reorganise how existing metrics are *displayed* on the
+# scientific report pages.  They do NOT affect METRIC_TYPES, the CSV/JSON
+# exports, or any statistical computation.
+# ===================================================================
+
+# ---------------------------------------------------------------------------
+# Structural metric categories — used to group the Structural Preservation
+# Analysis table into biologically meaningful families.
+# ---------------------------------------------------------------------------
+
+METRIC_CATEGORIES: Dict[str, List[str]] = {
+    "Topology": [
+        "basic_structure.node_count",
+        "basic_structure.edge_count",
+        "basic_structure.density",
+    ],
+    "Synaptic Properties": [
+        "basic_structure.total_synapses",
+        "basic_structure.weight_mean",
+        "basic_structure.weight_median",
+        "basic_structure.weight_variance",
+        "basic_structure.weight_std",
+        "basic_structure.weight_max",
+        "basic_structure.weight_min",
+    ],
+    "Connectivity": [
+        "connected_components.wcc_max_size",
+        "connected_components.scc_max_size",
+        "connected_components.wcc_count",
+        "connected_components.scc_count",
+    ],
+    "Network Organization": [
+        "reciprocity.reciprocity",
+        "assortativity.degree_assortativity",
+    ],
+}
+
+# ---------------------------------------------------------------------------
+# Network similarity metrics (derived from vector comparisons)
+# ---------------------------------------------------------------------------
+# These are the *derived* scalar summaries of vector comparisons — the raw
+# per-node vectors are never displayed.  Keys are ``analysis.metric``.
+
+SIMILARITY_METRICS: Dict[str, str] = {
+    "pagerank.pagerank_scores_pearson":       "PageRank Pearson Correlation",
+    "pagerank.pagerank_scores_spearman":      "PageRank Spearman Correlation",
+    "pagerank.pagerank_scores_topk_overlap":  "PageRank Top-K Overlap",
+    "degree_distribution.in_degrees_ks":       "In-Degree KS Statistic",
+    "degree_distribution.in_degrees_wasserstein": "In-Degree Wasserstein Distance",
+    "degree_distribution.in_degrees_mean_baseline":  "In-Degree Mean (Baseline)",
+    "degree_distribution.in_degrees_mean_perturbed": "In-Degree Mean (Perturbed)",
+    "degree_distribution.in_degrees_var_baseline":   "In-Degree Variance (Baseline)",
+    "degree_distribution.in_degrees_var_perturbed":  "In-Degree Variance (Perturbed)",
+    "degree_distribution.out_degrees_ks":      "Out-Degree KS Statistic",
+    "degree_distribution.out_degrees_wasserstein": "Out-Degree Wasserstein Distance",
+    "degree_distribution.out_degrees_mean_baseline":  "Out-Degree Mean (Baseline)",
+    "degree_distribution.out_degrees_mean_perturbed": "Out-Degree Mean (Perturbed)",
+    "degree_distribution.out_degrees_var_baseline":   "Out-Degree Variance (Baseline)",
+    "degree_distribution.out_degrees_var_perturbed":  "Out-Degree Variance (Perturbed)",
+}
+
+
+# ---------------------------------------------------------------------------
+# Error model explanatory summaries  (presentation text only)
+# ---------------------------------------------------------------------------
+
+ERROR_MODEL_SUMMARIES: Dict[str, Dict[str, str]] = {
+    "missed_synapses": {
+        "display_name": "Missed Synapses",
+        "biological_effect":
+            "Removes existing synaptic connections (false negatives).",
+        "expected_structural_effect":
+            "Edge count ↓ · Total synapses ↓ · Connectivity largely preserved.",
+        "expected_analysis_effect":
+            "Weighted metrics (total synapses, PageRank) decline while purely "
+            "topological metrics remain largely stable.",
+    },
+    "false_synapses": {
+        "display_name": "False Synapses",
+        "biological_effect":
+            "Introduces artificial synaptic connections (false positives).",
+        "expected_structural_effect":
+            "Edge count ↑ · Density ↑ · Reciprocity changes.",
+        "expected_analysis_effect":
+            "Structural metrics move above baseline; the preservation score "
+            "penalises deviation in either direction.",
+    },
+    "synapse_count_measurement": {
+        "display_name": "Synapse Count Measurement",
+        "biological_effect":
+            "Perturbs synapse-count estimates only (Gaussian measurement noise).",
+        "expected_structural_effect":
+            "Topology unchanged.",
+        "expected_analysis_effect":
+            "Weighted metrics (total synapses, weighted PageRank) vary while "
+            "topological metrics act as control variables.",
+    },
+}
+
+
+def error_model_summary(slug: str) -> Dict[str, str]:
+    """Return the explanatory summary dict for an error model slug."""
+    return ERROR_MODEL_SUMMARIES.get(slug, {
+        "display_name": slug.replace("_", " ").title(),
+        "biological_effect": "Simulates a biological reconstruction error.",
+        "expected_structural_effect": "See per-metric results.",
+        "expected_analysis_effect": "See per-metric results.",
+    })
+
 
 def pres_tier(value: float) -> str:
     """Map a preservation percentage to a UI colour tier (display only).
