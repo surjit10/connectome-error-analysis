@@ -47,7 +47,7 @@ def _preservation(ev, key: str) -> float:
     """Preservation % for one MetricEvaluation, honouring direction."""
     return calculate_preservation(
         ev.baseline_mean, ev.mean,
-        higher_is_better=higher_is_better(key),
+        higher_is_better=higher_is_better(key), metric_key=key,
     )
 
 

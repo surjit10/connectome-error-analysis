@@ -110,7 +110,7 @@ class TrendExporter(BaseExporter):
             return 100.0
         return calculate_preservation(
             ev.baseline_mean, ev.mean,
-            higher_is_better=higher_is_better(key),
+            higher_is_better=higher_is_better(key), metric_key=key,
         )
 
     # ------------------------------------------------------------------ #
@@ -188,7 +188,7 @@ class TrendExporter(BaseExporter):
                 if ev is not None:
                     pres = calculate_preservation(
                         ev.baseline_mean, ev.mean,
-                        higher_is_better=higher_is_better(key),
+                        higher_is_better=higher_is_better(key), metric_key=key,
                     )
                     preservations.append(pres)
             if preservations:

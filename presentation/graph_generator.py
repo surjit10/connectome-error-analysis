@@ -50,7 +50,7 @@ class GraphGenerator:
                     if is_preservation_metric(key):
                         preservation = calculate_preservation(
                             ev.baseline_mean, ev.mean,
-                            higher_is_better=higher_is_better(key),
+                            higher_is_better=higher_is_better(key), metric_key=key,
                         )
                         row_with_pres = {**row, "Preservation": preservation}
                         pres_rows.append(row_with_pres)

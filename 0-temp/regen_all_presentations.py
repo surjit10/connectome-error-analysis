@@ -200,15 +200,20 @@ def build_results(em_dir: Path):
             metrics[a_name] = {}
             for m_name, pm in m_dict.items():
                 if (a_name, m_name) in derived_keys:
-                    bm = None  # vector-derived: null hypothesis (baseline = 0)
+                    if m_name.endswith("pearson") or m_name.endswith("spearman") or m_name.endswith("top_k_overlap"):
+                        b_val = 1.0
+                    else:
+                        b_val = 0.0
+                    d = _safe_cohens_d(pm["mean"], pm["std"], pm["n"], b_val, 0.0, 1)
+                    b_mean, b_std, b_n = b_val, 0.0, 1
                 else:
                     bm = baseline.get(a_name, {}).get(m_name)
-                if bm:
-                    d = _safe_cohens_d(pm["mean"], pm["std"], pm["n"], bm["mean"], bm["std"], bm["n"])
-                    b_mean, b_std, b_n = bm["mean"], bm["std"], bm["n"]
-                else:
-                    d = _safe_cohens_d(pm["mean"], pm["std"], pm["n"], 0.0, 0.0, 1)
-                    b_mean, b_std, b_n = 0.0, 0.0, 1
+                    if bm:
+                        d = _safe_cohens_d(pm["mean"], pm["std"], pm["n"], bm["mean"], bm["std"], bm["n"])
+                        b_mean, b_std, b_n = bm["mean"], bm["std"], bm["n"]
+                    else:
+                        d = _safe_cohens_d(pm["mean"], pm["std"], pm["n"], 0.0, 0.0, 1)
+                        b_mean, b_std, b_n = 0.0, 0.0, 1
                 metrics[a_name][m_name] = MetricEvaluation(
                     metric_name=m_name, baseline_mean=b_mean, baseline_std=b_std,
                     mean=pm["mean"], std=pm["std"], ci_lower=pm["ci_lower"],

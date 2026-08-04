@@ -231,7 +231,7 @@ class TrendPlotter:
                     if ev and math.isfinite(ev.mean):
                         pres = calculate_preservation(
                             ev.baseline_mean, ev.mean,
-                            higher_is_better=higher_is_better(key),
+                            higher_is_better=higher_is_better(key), metric_key=key,
                         )
                         preservations.append(pres)
                     else:
@@ -298,7 +298,7 @@ class TrendPlotter:
                     if ev and math.isfinite(ev.mean):
                         pres = calculate_preservation(
                             ev.baseline_mean, ev.mean,
-                            higher_is_better=higher_is_better(key),
+                            higher_is_better=higher_is_better(key), metric_key=key,
                         )
                         pres_data[key].append(pres)
                     else:
@@ -396,7 +396,7 @@ class TrendPlotter:
                 if ev and math.isfinite(ev.mean):
                     pres = calculate_preservation(
                         ev.baseline_mean, ev.mean,
-                        higher_is_better=higher_is_better(key),
+                        higher_is_better=higher_is_better(key), metric_key=key,
                     )
                     preservations.append(pres)
             if preservations:

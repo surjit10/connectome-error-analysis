@@ -208,6 +208,7 @@ def calculate_preservation(
     baseline: float,
     perturbed: float,
     higher_is_better: bool = True,
+    metric_key: str = "",
 ) -> float:
     """Compute symmetric preservation percentage between baseline and perturbed.
 
@@ -232,12 +233,19 @@ def calculate_preservation(
         higher_is_better:
             ``True`` (default) for metrics where larger values indicate
             better biological preservation.
+        metric_key:
+            Optional identifier for metric-specific handling.
 
     Returns:
         Preservation percentage in [0, 100].
     """
     if not _isfinite(baseline) or not _isfinite(perturbed):
         return 0.0
+
+    # Metric-specific similarity for variables that can cross zero
+    if metric_key == "assortativity.degree_assortativity":
+        diff = abs(perturbed - baseline)
+        return max(0.0, 1.0 - diff) * 100.0
 
     if baseline == 0.0:
         return 100.0 if perturbed == 0.0 else 0.0
@@ -248,6 +256,9 @@ def calculate_preservation(
         if ratio > 1.0:
             ratio = 1.0 / ratio
     else:
+        # Zero-division safeguard: if it dropped to 0 and baseline was > 0, it's a perfect improvement.
+        if perturbed == 0.0:
+            return 100.0 if baseline > 0.0 else 0.0
         ratio = baseline / perturbed
         # Lower-is-better: improvement → 100%, worsening → ratio (< 1).
         ratio = min(ratio, 1.0)
@@ -345,7 +356,7 @@ def render_preservation_metric(
     # Compute preservation
     preservation = calculate_preservation(
         baseline_mean, perturbed_mean,
-        higher_is_better=higher_is_better(key),
+        higher_is_better=higher_is_better(key), metric_key=key,
     )
 
     return {

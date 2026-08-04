@@ -58,7 +58,7 @@ class DashboardSerializer:
                             preservation[key] = {}
                         pres = calculate_preservation(
                             ev.baseline_mean, ev.mean,
-                            higher_is_better=higher_is_better(key),
+                            higher_is_better=higher_is_better(key), metric_key=key,
                         )
                         preservation[key][rate_str] = round(pres, 2)
                     
@@ -88,7 +88,7 @@ class DashboardSerializer:
                         if key in KEY_INTEGRITY_METRICS:
                             pres = calculate_preservation(
                                 ev.baseline_mean, ev.mean,
-                                higher_is_better=higher_is_better(key),
+                                higher_is_better=higher_is_better(key), metric_key=key,
                             )
                             preservations.append(pres)
                 if preservations:

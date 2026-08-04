@@ -140,7 +140,7 @@ class SingleRateExporter(BaseExporter):
                 if is_preservation_metric(key):
                     pres = calculate_preservation(
                         ev.baseline_mean, ev.mean,
-                        higher_is_better=higher_is_better(key),
+                        higher_is_better=higher_is_better(key), metric_key=key,
                     )
                     row["preservation_pct"] = round(pres, 4)
                 else:
@@ -174,7 +174,7 @@ class SingleRateExporter(BaseExporter):
                 if is_preservation_metric(key):
                     pres = calculate_preservation(
                         ev.baseline_mean, ev.mean,
-                        higher_is_better=higher_is_better(key),
+                        higher_is_better=higher_is_better(key), metric_key=key,
                     )
                     _, bio_label, _ = get_biological_status(pres)
                     entry["preservation_pct"] = round(pres, 4)

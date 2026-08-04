@@ -176,7 +176,7 @@ class DatasetExporter(BaseExporter):
                     found = True
                     pres = calculate_preservation(
                         ev.baseline_mean, ev.mean,
-                        higher_is_better=higher_is_better(key),
+                        higher_is_better=higher_is_better(key), metric_key=key,
                     )
                     cells.append({
                         "rate_pct": f"{rate*100:g}",
@@ -215,7 +215,7 @@ class DatasetExporter(BaseExporter):
                         continue
                     vals.append(calculate_preservation(
                         ev.baseline_mean, ev.mean,
-                        higher_is_better=higher_is_better(key),
+                        higher_is_better=higher_is_better(key), metric_key=key,
                     ))
 
                 if vals:
@@ -263,7 +263,7 @@ class DatasetExporter(BaseExporter):
                     continue
                 pres_list.append(calculate_preservation(
                     ev.baseline_mean, ev.mean,
-                    higher_is_better=higher_is_better(key),
+                    higher_is_better=higher_is_better(key), metric_key=key,
                 ))
             if pres_list:
                 overall_by_rate.append({
