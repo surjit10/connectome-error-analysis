@@ -63,3 +63,4 @@ __all__ = [
 from . import missed_synapses
 from . import false_synapses
 from . import synapse_count
+from . import split_errors

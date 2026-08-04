@@ -1,0 +1,38 @@
+# ---------------------------------------------------------------------------
+# Split Errors (EM4) Error Model Configuration
+# ---------------------------------------------------------------------------
+# Consumed by modules.error_models.split_errors.model.SplitErrorsModel._perturb()
+#
+# Scientific interpretation (docs/error model/em4/method plan.md):
+#   error_rate = fraction of ELIGIBLE neurons (degree >= degree_threshold)
+#   selected for splitting into exactly two fragments.  E.g. error_rate=0.05
+#   with 10,000 eligible neurons -> 500 neurons split.
+#
+# Only parameters defined by the methodology are listed here:
+#   - eligibility threshold (degree >= 10, recommended)
+#   - fragment quality (minimum partners per fragment >= 3, recommended)
+#   - bounded rejection re-sampling
+#   - community-detection fallback algorithm (Louvain)
+# ---------------------------------------------------------------------------
+
+error_model: split_errors
+
+# Fraction of eligible neurons selected for splitting (in [0.0, 1.0]).
+error_rate: 0.05
+
+# Minimum total degree (in + out) for a neuron to be eligible for splitting.
+# Method plan: "Degree >= threshold — Recommended: Degree >= 10".
+degree_threshold: 10
+
+# Minimum number of partners that every fragment must contain.  A split that
+# yields a smaller fragment with fewer partners is rejected and another
+# neuron is sampled.  Method plan: "Minimum Partners >= 3 — Recommended".
+min_fragment_partners: 3
+
+# Bounded number of re-sampled neurons when a sampled neuron is rejected.
+# Method plan: "Reject and sample another neuron".
+max_retries: 20
+
+# Community-detection fallback executed only when the (centre-removed) ego
+# graph is connected.  The methodology defines Louvain as the algorithm.
+community_algorithm: louvain
