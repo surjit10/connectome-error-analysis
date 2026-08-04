@@ -1,0 +1,15 @@
+Statistic,Value
+minimum,3.0
+maximum,913.0
+mean,7.755487082371835
+median,5.0
+mode,3.0
+variance,136.89957022329043
+standard deviation,11.700408976753351
+25th percentile,3.0
+50th percentile,5.0
+75th percentile,8.0
+90th percentile,15.0
+95th percentile,22.0
+99th percentile,53.0
+99.9th percentile,140.0

@@ -154,6 +154,12 @@ class DatasetExporter(BaseExporter):
         for category, keys in METRIC_CATEGORIES.items():
             rows = []
             for key in keys:
+                # Only preservation-type metrics belong in a preservation
+                # matrix.  "change" metrics (e.g. wcc_count, scc_count) are
+                # structural reorganisation indicators reported with delta%
+                # in the per-rate reports, not with a preservation score.
+                if not is_preservation_metric(key):
+                    continue
                 cells = []
                 found = False
                 for rate in sorted_rates:
@@ -205,10 +211,13 @@ class DatasetExporter(BaseExporter):
                     ev = self._trend.metrics_by_rate.get(rate, {}).get(key)
                     if ev is None:
                         continue
+                    if not is_preservation_metric(key):
+                        continue
                     vals.append(calculate_preservation(
                         ev.baseline_mean, ev.mean,
                         higher_is_better=higher_is_better(key),
                     ))
+
                 if vals:
                     found = True
                     cells.append({

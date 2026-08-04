@@ -23,22 +23,35 @@ from typing import Dict, List, Tuple
 # Key format: "analysis_name.metric_name"
 
 METRIC_TYPES: Dict[str, str] = {
-    "basic_structure.node_count":        "preservation",
-    "basic_structure.edge_count":        "preservation",
-    "basic_structure.total_synapses":    "preservation",
-    "basic_structure.density":           "preservation",
-    "connected_components.wcc_max_size": "preservation",
-    "connected_components.scc_max_size": "preservation",
-    "reciprocity.reciprocity":           "preservation",
-    "connected_components.wcc_count":    "change",
-    "connected_components.scc_count":    "change",
+    # -- Topology --------------------------------------------------------
+    "basic_structure.node_count":           "preservation",
+    "basic_structure.edge_count":           "preservation",
+    "basic_structure.density":              "preservation",
+    # -- Synaptic Properties ---------------------------------------------
+    "basic_structure.total_synapses":       "preservation",
+    "basic_structure.weight_mean":          "preservation",
+    "basic_structure.weight_median":        "preservation",
+    "basic_structure.weight_variance":      "preservation",
+    "basic_structure.weight_std":           "preservation",
+    "basic_structure.weight_max":           "preservation",
+    "basic_structure.weight_min":           "preservation",
+    # -- Connectivity ----------------------------------------------------
+    "connected_components.wcc_max_size":    "preservation",
+    "connected_components.scc_max_size":    "preservation",
+    "connected_components.wcc_count":       "change",
+    "connected_components.scc_count":       "change",
+    # -- Network Organization --------------------------------------------
+    "reciprocity.reciprocity":              "preservation",
+    "assortativity.degree_assortativity":   "preservation",
 }
 
 
 def get_metric_type(key: str) -> str:
     """Return the metric type: \"preservation\", \"change\", or \"similarity\".
 
-    Falls back to \"preservation\" for unknown metrics (conservative default).
+    Falls back to \"similarity\" for unknown metrics (e.g. vector-comparison
+    metrics like PageRank correlations and KS statistics, which have their own
+    similarity measures and are never given a preservation %).
     """
     return METRIC_TYPES.get(key, "similarity")
 
@@ -153,11 +166,18 @@ METRIC_DISPLAY_NAMES: Dict[str, str] = {
     "basic_structure.edge_count":        "Edge Count",
     "basic_structure.total_synapses":    "Total Synapses",
     "basic_structure.density":           "Density",
+    "basic_structure.weight_mean":       "Weight Mean",
+    "basic_structure.weight_median":     "Weight Median",
+    "basic_structure.weight_variance":   "Weight Variance",
+    "basic_structure.weight_std":        "Weight Std",
+    "basic_structure.weight_max":        "Weight Max",
+    "basic_structure.weight_min":        "Weight Min",
     "connected_components.wcc_count":    "WCC Count",
     "connected_components.wcc_max_size": "Largest WCC",
     "connected_components.scc_count":    "SCC Count",
     "connected_components.scc_max_size": "Largest SCC",
     "reciprocity.reciprocity":           "Reciprocity",
+    "assortativity.degree_assortativity": "Degree Assortativity",
 }
 
 
