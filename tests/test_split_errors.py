@@ -351,6 +351,42 @@ class TestSplitModel:
         assert hub_prepared.graph.vcount() == vcount
         assert hub_prepared.graph.ecount() == ecount
 
+    def test_no_module_level_graph_cache_retains_graphs(self) -> None:
+        """EM4 must not retain baseline graphs between trials.
+
+        Regression test for the notebook OOM root cause: a module-level
+        ``_candidate_cache`` keyed by ``id(graph)`` kept a strong reference
+        to every trial's freshly-built baseline graph, so a 45-trial
+        notebook run pinned ~45 full connectome copies in RAM.  After the
+        fix there is no such cache and old graphs must be garbage-collectable
+        once a trial finishes.
+        """
+        import gc
+        import weakref
+
+        from modules.error_models import registry as error_registry
+        import modules.error_models.split_errors.model as split_model
+
+        assert not hasattr(split_model, "_candidate_cache")
+
+        model = error_registry.instantiate("split_errors")
+        cfg = {"error_rate": 0.5, "degree_threshold": 10,
+               "min_fragment_partners": 3, "max_retries": 20}
+
+        refs = []
+        for t in range(3):
+            prepared = preprocess_graph(
+                build_two_cluster_hub(), index_node_attrs=[]
+            )
+            refs.append(weakref.ref(prepared.graph))
+            model.execute(prepared, config=cfg, seed=t)
+            del prepared
+
+        gc.collect()
+        assert all(r() is None for r in refs), (
+            "EM4 must not retain strong references to trial graphs"
+        )
+
     def test_unknown_config_key_warns(self, hub_prepared) -> None:
         from modules.error_models import registry
 

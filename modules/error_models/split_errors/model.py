@@ -91,18 +91,6 @@ _DEFAULT_MAX_RETRIES = 20               # bounded re-sampling on rejection
 _DEFAULT_COMMUNITY_ALGORITHM = "louvain"
 
 # ---------------------------------------------------------------------------
-# Module-level candidate cache (candidate preparation is performed once)
-# ---------------------------------------------------------------------------
-
-#: id(prepared.graph) -> (graph_ref, degrees, unique_partners).
-#: The baseline graph is immutable for the lifetime of an experiment, so
-#: ``id()`` is a stable key.  A **strong reference to the graph is kept in
-#: the cache** so that the id cannot be reused by a garbage-collected graph
-#: (mirrors the module-level candidate-table cache used by EM2).
-_candidate_cache: Dict[int, Tuple[Any, List[int], List[int]]] = {}
-
-
-# ---------------------------------------------------------------------------
 # Fragment ID encoding
 # ---------------------------------------------------------------------------
 
@@ -375,24 +363,23 @@ class SplitErrorsModel(BaseErrorModel):
         for eligibility and splitting; weighted degree is recorded in the
         metadata for completeness without changing the algorithm.
 
-        Performed once per baseline graph (cached by object identity).
+        Performed once per trial inside ``_perturb`` with a fresh baseline
+        graph.  Computed fresh on every call: a module-level cache keyed by
+        ``id(graph)`` could never serve a hit here (each trial builds a new
+        graph and preparation runs exactly once per trial) while keeping a
+        strong reference to every trial's graph alive, so it has been removed.
         Complexity O(V+E).
         """
-        key = id(graph)
-        if key in _candidate_cache:
-            return _candidate_cache[key][1], _candidate_cache[key][2]
-
         degrees: List[int] = graph.degree()  # total (in + out) degree
         unique_partners: List[int] = [
             len(set(graph.neighbors(v, mode="all")))
             for v in range(graph.vcount())
         ]
 
-        _candidate_cache[key] = (graph, degrees, unique_partners)
         logger.info(
-            "[SplitErrors] Candidate preparation complete for graph id=%s "
+            "[SplitErrors] Candidate preparation complete "
             "(%d vertices, %d edges).",
-            key, graph.vcount(), graph.ecount(),
+            graph.vcount(), graph.ecount(),
         )
         return degrees, unique_partners
 
