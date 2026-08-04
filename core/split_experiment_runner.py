@@ -248,6 +248,18 @@ class SplitExperimentRunner:
                 analysis_target, config, result
             )
 
+        # ── Step 7.5: EM4 PageRank alignment (isolated, EM4-only) ───────
+        # EM4 deletes parent vertices, so temp-graph vectors live in a
+        # different vertex-index space than the baseline vectors.  The shared
+        # comparison pipeline (StatisticsEngine / VectorComparisonRegistry)
+        # compares vectors positionally, which collapses Pearson/Spearman and
+        # Top-K overlap.  Rebuild the PageRank vector in baseline ordering
+        # here — entirely inside EM4 — before any temporary mapping is
+        # destroyed, then clean up exactly as before (the split_plan pop
+        # below is unchanged).  The shared framework never sees the alignment.
+        if temp_graph is not None:
+            self._align_pagerank_vector(result, prepared, split_plan, temp_graph)
+
         # ── Step 8: Destroy temporary graph immediately ──────────────────
         if temp_graph is not None:
             del temp_graph
@@ -259,6 +271,64 @@ class SplitExperimentRunner:
         # Release the transient split plan (only needed for temp construction).
         if error_result is not None and error_result.extra:
             error_result.extra.pop("split_plan", None)
+
+    # ------------------------------------------------------------------ #
+    # EM4-only vector alignment (isolated stage)                            #
+    # ------------------------------------------------------------------ #
+
+    def _align_pagerank_vector(
+        self,
+        result: ExperimentResult,
+        prepared: Any,
+        split_plan: Dict[Any, Dict[str, Any]],
+        temp_graph: igraph.Graph,
+    ) -> None:
+        """Replace the PageRank vector in EM4 analysis results with one
+        aligned to the baseline vertex ordering.
+
+        Called immediately after analyses complete and before the temporary
+        graph is destroyed.  Only the ``pagerank_scores`` metric of the
+        ``pagerank`` analysis is touched; every other metric continues to
+        flow through the existing pipeline untouched.
+
+        All logic lives in the EM4-only helper
+        :mod:`core.split_vector_alignment`; the shared framework modules are
+        never modified and never learn that alignment occurred.
+        """
+        if not split_plan:
+            return
+
+        from core.split_vector_alignment import (
+            align_pagerank_vectors,
+            build_baseline_order,
+            build_split_parents,
+            build_temp_root_to_index,
+        )
+
+        baseline_order = build_baseline_order(
+            prepared.lookup.id_map, prepared.graph.vcount()
+        )
+        temp_root_to_index = build_temp_root_to_index(temp_graph)
+        split_parents = build_split_parents(split_plan)
+
+        for a_res in result.analysis_results:
+            if a_res.analysis_name != "pagerank":
+                continue
+            vector = a_res.metrics.get("pagerank_scores")
+            if vector is None:
+                continue
+            aligned = align_pagerank_vectors(
+                list(vector),
+                baseline_order,
+                temp_root_to_index,
+                split_parents,
+            )
+            a_res.metrics["pagerank_scores"] = aligned
+            logger.info(
+                "[SplitExperimentRunner] Aligned pagerank_scores to baseline "
+                "ordering: %d -> %d entries (%d split neurons aggregated).",
+                len(vector), len(aligned), len(split_plan),
+            )
 
     # ------------------------------------------------------------------ #
     # EM4-specific temporary graph construction (isolated stage)            #
