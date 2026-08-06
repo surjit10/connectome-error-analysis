@@ -1,0 +1,478 @@
+% ============================================================================
+%  Impact of Reconstruction Errors on Connectome Graph Analysis
+%  Beamer presentation — BANC dataset experiments (EM1 missed synapses,
+%  EM2 false synapses). All numbers are read from the experiment outputs
+%  under results/BANC/... (combined_results.csv aggregates).
+%  Compile: pdflatex main.tex (twice)
+% ============================================================================
+\documentclass[aspectratio=169,11pt]{beamer}
+
+% ---- encoding & fonts ------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+
+% ---- palette ---------------------------------------------------------------
+\definecolor{navy}{RGB}{22,41,66}
+\definecolor{accent}{RGB}{11,110,153}    % blue  (missed synapses)
+\definecolor{accentb}{RGB}{196,69,29}    % orange (false synapses)
+\definecolor{baselinec}{RGB}{154,165,177}
+\definecolor{boxlight}{RGB}{242,246,250}
+\definecolor{boxtitle}{RGB}{22,41,66}
+\definecolor{okgreen}{RGB}{90,143,78}
+\definecolor{warnc}{RGB}{217,164,65}
+
+% ---- beamer look -----------------------------------------------------------
+\setbeamercolor{structure}{fg=navy}
+\setbeamercolor{frametitle}{fg=navy}
+\setbeamercolor{normal text}{fg=navy!90}
+\setbeamercolor{itemize item}{fg=accent}
+\setbeamercolor{itemize subitem}{fg=accent!70}
+\setbeamercolor{block title}{fg=white,bg=boxtitle}
+\setbeamercolor{block body}{bg=boxlight}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{blocks}[rounded][shadow=false]
+\setbeamertemplate{block body begin}{\raggedright}
+
+% frametitle: navy title over an accent rule
+\setbeamertemplate{frametitle}{%
+  \vskip6pt
+  \noindent\usebeamerfont{frametitle}\insertframetitle\par
+  \vskip2pt
+  {\color{accent}\hrule height1.2pt}
+  \vskip4pt
+}
+
+% footline: dataset | deck title | page number
+\setbeamertemplate{footline}{%
+  \leavevmode\hbox{%
+    \begin{beamercolorbox}[wd=.30\paperwidth,ht=2.4ex,dp=1ex,left]{author in head/foot}%
+      \hspace*{0.35cm}\scriptsize\color{baselinec}BANC Dataset
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.40\paperwidth,ht=2.4ex,dp=1ex,center]{title in head/foot}%
+      \scriptsize\color{baselinec}Reconstruction Errors on Connectome Analysis
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.30\paperwidth,ht=2.4ex,dp=1ex,right]{date in head/foot}%
+      \scriptsize\color{baselinec}\insertframenumber{} / \inserttotalframenumber\hspace*{0.35cm}
+    \end{beamercolorbox}}%
+}
+
+\begin{document}
+
+% ============================================================================
+% Slide 1 — Title
+% ============================================================================
+{
+\setbeamertemplate{footline}{}
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \fill[navy] (current page.north west) rectangle ([yshift=-3.4cm]current page.north east);
+    \fill[accent] ([yshift=-3.4cm]current page.north west) rectangle ([yshift=-3.62cm]current page.north east);
+  \end{tikzpicture}
+  \vspace*{1.15cm}
+  {\color{white}\LARGE\bfseries Impact of Reconstruction Errors\\[6pt] on Connectome Graph Analysis}
+  \vspace{1.1cm}
+
+  {\large\color{navy!80}Experimental Analysis of Missed Synapses and False Synapses}
+  \vspace{1.6cm}
+
+  \begin{tikzpicture}
+    \node[draw=accent, rounded corners=3pt, fill=accent!8, minimum width=3.6cm,
+          minimum height=0.7cm, font=\normalsize\color{navy}] {BANC Dataset};
+  \end{tikzpicture}
+  \vfill
+  {\footnotesize\color{baselinec}Neuron- and synapse-resolved connectome simulation study $\cdot$ 10 error rates $\cdot$ 5 trials each}
+\end{frame}
+}
+
+% ============================================================================
+% Slide 2 — Problem overview
+% ============================================================================
+\begin{frame}{Problem Overview}
+\centering
+\begin{tikzpicture}[
+  box/.style={draw=navy!70, fill=navy!8, rounded corners=4pt,
+              minimum width=5.6cm, minimum height=0.9cm, font=\small},
+  arr/.style={-{Stealth[length=3mm]}, thick, color=accent},
+  note/.style={font=\footnotesize, color=gray!55!black, text width=5.1cm, align=left}
+]
+  \node[box] (a) {Original connectome};
+  \node[note, right=0.6cm of a] (ca) {ground truth:\\ 158{,}262 neurons, 3{,}990{,}039 connections};
+  \node[box, below=0.52cm of a] (b) {Reconstruction errors};
+  \node[note, right=0.6cm of b] (cb) {two error models:\\ missed synapses \textbullet{} false synapses};
+  \node[box, below=0.52cm of b] (c) {Modified connectome};
+  \node[note, right=0.6cm of c] (cc) {synapses dropped / added at 10 error rates};
+  \node[box, below=0.52cm of c] (d) {Graph analysis};
+  \node[note, right=0.6cm of d] (cd) {49 metrics in 6 analysis families};
+  \node[box, below=0.52cm of d] (e) {Comparison with baseline};
+  \node[note, right=0.6cm of e] (ce) {preservation \textbullet{} distances \textbullet{} CIs};
+  \draw[arr] (a) -- (b);
+  \draw[arr] (b) -- (c);
+  \draw[arr] (c) -- (d);
+  \draw[arr] (d) -- (e);
+\end{tikzpicture}
+\end{frame}
+
+% ============================================================================
+% Slide 3 — Error models
+% ============================================================================
+\begin{frame}{Two Error Models}
+\begin{columns}[c]
+  \begin{column}{0.48\textwidth}
+    \begin{block}{Missed synapses (false negatives)}
+      \centering
+      \begin{tikzpicture}[
+        neuron/.style={circle, draw=navy, fill=navy!12, minimum size=0.52cm, font=\small},
+        syn/.style={font=\footnotesize, color=navy},
+        arr/.style={-{Stealth[length=2.5mm]}, thick, color=accent},
+        darr/.style={-{Stealth[length=3mm]}, thick, color=gray}
+      ]
+        \node[neuron] (A1) at (0,0) {A};
+        \node[neuron] (B1) at (3.0,0) {B};
+        \draw[arr] (A1) -- node[syn,above]{8 synapses}(B1);
+        \draw[darr] (1.5,-0.55) -- (1.5,-1.0);
+        \node[neuron] (A2) at (0,-1.5) {A};
+        \node[neuron] (B2) at (3.0,-1.5) {B};
+        \draw[arr] (A2) -- node[syn,above]{6 synapses}(B2);
+        \node[syn, below=0.3cm of B2, text width=3.6cm, align=center]
+          {edge removed if weight reaches 0};
+      \end{tikzpicture}\par\vspace{3pt}
+      \footnotesize Each synapse survives independently (binomial);\\ weight $=$ number of surviving synapses.
+    \end{block}
+  \end{column}
+  \begin{column}{0.48\textwidth}
+    \begin{block}{False synapses (false positives)}
+      \centering
+      \begin{tikzpicture}[
+        neuron/.style={circle, draw=navy, fill=navy!12, minimum size=0.52cm, font=\small},
+        syn/.style={font=\footnotesize, color=navy},
+        arr/.style={-{Stealth[length=2.5mm]}, thick, color=accentb},
+        darr/.style={-{Stealth[length=3mm]}, thick, color=gray},
+        none/.style={dashed, color=gray}
+      ]
+        \node[neuron] (A1) at (0,0) {A};
+        \node[neuron] (B1) at (3.0,0) {B};
+        \draw[none] (0.35,0.18) -- (2.65,0.18);
+        \node[syn, above=0.35cm of B1] {no connection};
+        \draw[darr] (1.5,-0.55) -- (1.5,-1.0);
+        \node[neuron] (A2) at (0,-1.5) {A};
+        \node[neuron] (B2) at (3.0,-1.5) {B};
+        \draw[arr] (A2) -- node[syn,above]{2--5 synapses}(B2);
+        \node[syn, below=0.3cm of B2, text width=3.6cm, align=center]
+          {new edge appears};
+      \end{tikzpicture}\par\vspace{3pt}
+      \footnotesize $k=$ rate $\times$ edges artificial connections added;\\ weight sampled from the weak-edge distribution (syn $\le$ 5).
+    \end{block}
+  \end{column}
+\end{columns}
+\end{frame}
+
+% ============================================================================
+% Slide 4 — Experimental setup
+% ============================================================================
+\begin{frame}{Experimental Setup}
+\begin{columns}[T]
+  \begin{column}{0.60\textwidth}
+    \footnotesize\renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{@{}ll@{}}
+      \toprule
+      \textbf{Dataset} & BANC --- \emph{D.~melanogaster} brain + nerve cord\\
+      \midrule
+      \textbf{Baseline} & 158{,}262 neurons $\cdot$ 3{,}990{,}039 connections\\[-2pt]
+                     & 23{,}556{,}214 synapses\\
+      \midrule
+      \textbf{Error rates} & 0, 0.25, 0.5, 0.75, 1, 2, 5, 10, 15, 20\%\\
+      \midrule
+      \textbf{Trials} & 5 seeded per rate (10 rates $\times$ 2 models)\\
+      \midrule
+      \textbf{Metrics} & 49 metrics in 6 analysis families\\
+      \midrule
+      \textbf{Runtime} & $\approx$3\,min per trial ($\approx$5\,h total)\\
+      \bottomrule
+    \end{tabular}
+  \end{column}
+  \begin{column}{0.38\textwidth}
+    \begin{block}{Pipeline (fixed order)}
+      \scriptsize
+      Load $\rightarrow$ Build $\rightarrow$ Preprocess $\rightarrow$\\[2pt]
+      \quad\textbf{Perturb (error model)} $\rightarrow$\\[2pt]
+      Analyze $\rightarrow$ Statistics $\rightarrow$ Export
+    \end{block}
+    \begin{block}{Analysis families}
+      \scriptsize
+      structure $\cdot$ degree distributions $\cdot$ SCC/WCC $\cdot$ reciprocity $\cdot$ assortativity $\cdot$ PageRank $\cdot$ similarity distances
+    \end{block}
+  \end{column}
+\end{columns}
+\end{frame}
+
+% ============================================================================
+% Slide 5 — Evaluation metrics
+% ============================================================================
+\begin{frame}{Evaluation Metrics --- Grouped by Graph Property}
+\centering
+\begin{tikzpicture}[
+  group/.style={draw=navy!60, fill=boxlight, rounded corners=5pt, inner sep=2pt,
+                minimum width=2.4cm, minimum height=3.4cm, text width=2.3cm,
+                align=center, font=\scriptsize}
+]
+  \node[group] (g1) at (0,0) {\begin{tikzpicture}
+      \fill[accent] (0,0) circle (0.07);
+      \fill[accent] (0.45,0) circle (0.07);
+      \fill[accent] (0.9,0) circle (0.07);
+      \draw[color=accent] (0.07,0) -- (0.38,0);
+      \draw[color=accent] (0.52,0) -- (0.83,0);
+    \end{tikzpicture}\\[4pt] \textbf{Topology}\\[2pt] edge count\\ density\\ degree distributions};
+  \node[group] (g2) at (2.9,0) {\begin{tikzpicture}
+      \draw[thick,color=accent] (0.28,0) circle (0.22);
+      \draw[thick,color=accent] (0.62,0) circle (0.22);
+    \end{tikzpicture}\\[4pt] \textbf{Connectivity}\\[2pt] weak / strong\\ connected components\\ (count, giant size)};
+  \node[group] (g3) at (5.8,0) {\begin{tikzpicture}
+      \draw[thick,color=accent] (0.45,0) circle (0.24);
+      \fill[accent] (0.45,0) circle (0.06);
+      \fill[accent!70] (0.26,0.16) circle (0.045);
+      \fill[accent!70] (0.64,0.16) circle (0.045);
+    \end{tikzpicture}\\[4pt] \textbf{Synaptic properties}\\[2pt] total synapses\\ weight mean / median\\ variance / max};
+  \node[group] (g4) at (8.7,0) {\begin{tikzpicture}
+      \foreach \x in {0,0.3,0.6} \foreach \y in {0,0.3} {
+        \fill[accent] (\x,\y) circle (0.05);}
+    \end{tikzpicture}\\[4pt] \textbf{Network organization}\\[2pt] reciprocity\\ assortativity\\ PageRank};
+  \node[group] (g5) at (11.5,0) {\begin{tikzpicture}
+      \draw[-{Stealth[length=2mm]},thick,color=accent] (0,0.05) -- (0.75,0.05);
+      \draw[-{Stealth[length=2mm]},thick,color=accent] (0.75,-0.05) -- (0,-0.05);
+    \end{tikzpicture}\\[4pt] \textbf{Similarity}\\[2pt] KS / Wasserstein\\ Pearson / Spearman\\ top-$k$ overlap};
+\end{tikzpicture}
+
+\vskip8pt
+\footnotesize
+49 metrics in five categories, compared with baseline (95\% CIs, 5 trials).
+\end{frame}
+
+% ============================================================================
+% Slide 6 — Missed synapses results
+% ============================================================================
+\begin{frame}{Missed Synapses --- Proportional Erosion, Intact Topology}
+\begin{columns}[c]
+  \begin{column}{0.50\textwidth}
+    \includegraphics[width=\textwidth]{fig_primary}\\
+    \footnotesize\textbf{Synapses:} loss is exactly proportional to rate ($-20.0\%$ at 20\%).\\
+    \textbf{Edges:} only $-3.2\%$ --- connections rarely vanish.
+  \end{column}
+  \begin{column}{0.50\textwidth}
+    \includegraphics[width=\textwidth]{fig_organization}\\
+    \footnotesize\textbf{Reciprocity} barely moves ($-0.6\%$).\\
+    \textbf{Giant SCC} keeps 99.95\% of vertices at 20\% --- wiring stays connected.
+  \end{column}
+\end{columns}
+\end{frame}
+
+% ============================================================================
+% Slide 7 — False synapses results
+% ============================================================================
+\begin{frame}{False Synapses --- Graph Inflation and Structural Distortion}
+\begin{columns}[c]
+  \begin{column}{0.52\textwidth}
+    \includegraphics[width=\textwidth]{fig_degree_dist}\\
+    \footnotesize\textbf{Degree distortion} grows nonlinearly --- KS distance $\approx$15$\times$\ larger than missed at 20\%.
+  \end{column}
+  \begin{column}{0.46\textwidth}
+    \includegraphics[width=0.9\textwidth]{fig_pagerank}\\
+    \footnotesize\textbf{Hub ranking} erodes: top-$k$ overlap 0.89 at 20\% (vs 0.97 for missed).\\
+    Added edges are weak ($\approx$3 synapses vs.\ mean 5.9).
+  \end{column}
+\end{columns}
+\end{frame}
+
+% ============================================================================
+% Slide 8 — Comparison
+% ============================================================================
+\begin{frame}{Comparison --- False Synapses Are More Disruptive}
+\begin{columns}[T]
+  \begin{column}{0.60\textwidth}
+    \includegraphics[width=\textwidth]{fig_ranking}\\
+    \footnotesize Minimum preservation per metric, 0--20\% rates (thresholds: \color{accentb}$<$90\color{navy} / \color{warnc}$<$95\color{navy} / \color{okgreen}$<$99\color{navy}).
+  \end{column}
+  \begin{column}{0.38\textwidth}
+    \footnotesize\renewcommand{\arraystretch}{1.3}\setlength{\tabcolsep}{4pt}
+    \begin{tabular}{@{}lrr@{}}
+      \toprule
+      \textbf{Metric @20\%} & \textbf{Missed} & \textbf{False}\\
+      \midrule
+      Total synapses & $-20.0\%$ & $+10.0\%$\\
+      Edges & $-3.2\%$ & $+20.0\%$\\
+      Reciprocity & $-0.6\%$ & $+7.1\%$\\
+      SCC giant & $-0.05\%$ & $+0.4\%$\\
+      PageRank corr. & 0.997 & 0.983\\
+      Top-$k$ overlap & 0.97 & 0.89\\
+      \bottomrule
+    \end{tabular}\par\vspace{4pt}
+    {\footnotesize\color{accentb}Same nominal rate ---\\ larger structural effect.}
+  \end{column}
+\end{columns}
+\end{frame}
+
+% ============================================================================
+% Slide 9 — Category-wise preservation at 20% error
+% ============================================================================
+\begin{frame}{Category-wise Preservation at 20\% Error}
+\begin{columns}[T]
+  \begin{column}{0.50\textwidth}
+    \scriptsize\setlength{\tabcolsep}{6pt}
+    \renewcommand{\arraystretch}{1.08}
+    \centering
+    \begin{tabular}{@{}llcc@{}}
+      \toprule
+      \textbf{Category} & \textbf{Metrics} & \textbf{Missed} & \textbf{False}\\
+      \midrule
+      Structural Topology & 3 & 97.87\% & 88.89\%\\
+      Synaptic Properties & 7 & 83.10\% & 90.67\%\\
+      Connectivity & 2 & 99.97\% & 99.80\%\\
+      Network Organization & 2 & 99.53\% & 95.95\%\\
+      \bottomrule
+    \end{tabular}
+
+    \vspace{2pt}
+    \noindent\scriptsize\color{navy}Metrics = number of preservation metrics contributing to the category average.
+
+    \noindent\begin{beamercolorbox}[rounded=true,sep=1.5pt]{block body}
+      {\scriptsize\color{navy}\textbf{At the 20\% error rate} --- unweighted mean of member-metric preservation scores (calculation on next slide). Weight / assortativity values recomputed with the framework's current formula (see \texttt{correction.md}).}
+    \end{beamercolorbox}
+  \end{column}
+  \begin{column}{0.48\textwidth}
+    \begin{block}{Most robust --- global architecture}
+      \footnotesize Node count, giant WCC/SCC ($>$99.6\%), PageRank correlation ($\approx$0.98--1.0) and top-$k$ overlap stay high under both models.
+    \end{block}
+    \begin{block}{Most sensitive --- synaptic layer}
+      \footnotesize Synaptic statistics respond first under missed (weight variance 69\%, median 75\%, synapses 80\%); edge count / density under false (83\%); KS distorts 14--27$\times$.
+    \end{block}
+    \begin{block}{Trend shape}
+      \footnotesize Primary quantities are \emph{linear} in rate (synapse loss, edge gain); secondary effects (distances, reciprocity) are sublinear and accelerating.
+    \end{block}
+    \vspace{-6pt}
+  \end{column}
+\end{columns}
+\end{frame}
+
+% ============================================================================
+% Slide 10 — How preservation is calculated
+% ============================================================================
+\begin{frame}{How is Preservation Calculated?}
+\begin{columns}[T]
+  \begin{column}{0.50\textwidth}
+    \begin{block}{Symmetric preservation ratio}
+      \scriptsize
+      Each graph metric is first converted into a preservation score using the symmetric ratio
+      \[\mathrm{Preservation\,(\%)} =\frac{\min(\mathrm{Baseline},\mathrm{Perturbed})}{\max(\mathrm{Baseline},\mathrm{Perturbed})}\times 100\]
+      where \emph{Baseline} = original graph metric and \emph{Perturbed} = graph metric after reconstruction error.
+
+      \medskip
+      Category preservation is then computed as the \emph{unweighted arithmetic mean} of all preservation metrics belonging to that biological category.
+    \end{block}
+  \end{column}
+  \begin{column}{0.48\textwidth}
+    \begin{block}{Example --- category $=$ Average(member metrics)}
+      \scriptsize
+      Structural Topology $=$ Average(Node Count, Edge Count, Density)\\
+      Synaptic Properties $=$ Average(Total Synapses, Weight Mean, Weight Median,\\
+      \hspace{1.15cm} Weight Variance, Weight Standard Deviation,\\
+      \hspace{1.15cm} Weight Maximum, Weight Minimum)\\
+      Connectivity $=$ Average(Largest WCC, Largest SCC)\\
+      Network Organization $=$ Average(Reciprocity, Degree Assortativity)
+    \end{block}
+  \end{column}
+\end{columns}
+
+\vspace{-3pt}
+\noindent\begin{beamercolorbox}[rounded=true,sep=2pt]{block body}
+  {\scriptsize\color{navy}\textbf{Scientific Note:}\ Rather than combining heterogeneous graph metrics into one overall preservation score, the report summarizes preservation separately for each biological category. This provides a more interpretable view of how reconstruction errors affect different aspects of the connectome while preserving the original metric-level calculations.}
+\end{beamercolorbox}
+\end{frame}
+
+% ============================================================================
+% Slide 10 — Reliability
+% ============================================================================
+\begin{frame}{Reliability of the Results}
+\begin{columns}[T]
+  \begin{column}{0.52\textwidth}
+    \small\begin{itemize}
+      \item \textbf{5 seeded trials} per rate $\times$ 10 rates $\times$ 2 models (490 aggregated rows per model).
+      \item \textbf{Tight confidence intervals:} total-synapse $\sigma$ is only $\approx$0.01\% of the mean at 20\%.
+      \item \textbf{Deterministic perturbation:} false edges reproduce exactly ($\sigma=0$); missed trials agree to within $\approx$0.01\% of the mean.
+      \item \textbf{Monotone} primary trends (synapses, edges, KS) across all ten rates --- no flips; higher-order metrics show only mild low-rate non-monotonicity.
+      \item \textbf{Consistent status labels} (Preserved $\ge$99\% / Minor $\ge$95\% / Moderate $\ge$90\% / Significant $<$90\%) across trials.
+    \end{itemize}
+  \end{column}
+  \begin{column}{0.46\textwidth}
+    \begin{block}{Spread @20\% --- $\sigma$ / mean (rel.)}
+      \renewcommand{\arraystretch}{1.4}
+      \begin{tabular}{@{}lll@{}}
+        \toprule
+        \textbf{Metric} & \textbf{Missed} & \textbf{False}\\
+        \midrule
+        Total synapses & $\pm$0.009\% & $\pm$0.005\%\\
+        Edge count & $\pm$0.005\% & $\pm$0.000\%\\
+        SCC giant & $\pm$0.010\% & $\pm$0.006\%\\
+        \bottomrule
+      \end{tabular}
+    \end{block}
+  \end{column}
+\end{columns}
+\end{frame}
+
+% ============================================================================
+% Slide 11 — Conclusions
+% ============================================================================
+\begin{frame}{Conclusions}
+\begin{block}{Direct, measurable effects}
+  \footnotesize Missed synapses remove synapses \emph{exactly} in proportion to the rate ($-20.0\%$ at 20\%); false synapses add edges \emph{exactly} in proportion ($+20.0\%$). These are the most sensitive quantities measured.
+\end{block}
+\begin{block}{Topology is highly robust}
+  \footnotesize The giant connected component and node count survive to $>$99\% even at 20\% error --- the coarse wiring plan is barely disturbed (PageRank correlation stays $\ge$0.98).
+\end{block}
+\begin{block}{False synapses are the more disruptive model}
+  \footnotesize At equal nominal rates they distort degree distributions 14--27$\times$ more (in-degree KS), erode hub ranking (top-$k$ 0.89 vs 0.97 for missed) and raise reciprocity by $+7\%$.
+\end{block}
+\begin{block}{Error signatures are separable}
+  \footnotesize Missed synapses \emph{deflate} synaptic statistics; false synapses \emph{inflate} the graph --- weak edges ($\approx$3 synapses) dilute weights without creating strong hubs.
+\end{block}
+\end{frame}
+
+% ============================================================================
+% Slide 12 — Summary
+% ============================================================================
+\begin{frame}{Summary}
+\centering
+\begin{tikzpicture}[
+  lane/.style={rounded corners=4pt, minimum width=4.1cm, minimum height=1.0cm,
+               font=\footnotesize, draw, align=center},
+  arr/.style={-{Stealth[length=3mm]}, thick, color=gray}
+]
+  % lane 1 — missed synapses
+  \node[lane, draw=baselinec, fill=baselinec!10] (m0) at (0,0) {Original network\\ 23.6\,M synapses};
+  \node[lane, draw=accent, fill=accent!8] (m1) at (0,-1.8) {Missed synapses\\ (rate $\rightarrow$ 20\%)};
+  \node[lane, draw=accent!70, fill=accent!15, text width=4.7cm] (m2) at (0,-3.6)
+        {-20\% synapses, -3.2\% edges\\ SCC 99.95\% intact\\ PageRank 0.997\\ \emph{proportional, predictable}};
+  \draw[arr] (m0) -- (m1);
+  \draw[arr] (m1) -- (m2);
+  % lane 2 — false synapses
+  \node[lane, draw=baselinec, fill=baselinec!10] (f0) at (7.0,0) {Original network\\ 23.6\,M synapses};
+  \node[lane, draw=accentb, fill=accentb!8] (f1) at (7.0,-1.8) {False synapses\\ (rate $\rightarrow$ 20\%)};
+  \node[lane, draw=accentb!70, fill=accentb!15, text width=4.7cm] (f2) at (7.0,-3.6)
+        {+20\% edges, +10\% synapses\\ degree KS $\times$15, top-$k$ 0.89\\ \emph{inflation, structural distortion}};
+  \draw[arr] (f0) -- (f1);
+  \draw[arr] (f1) -- (f2);
+\end{tikzpicture}
+
+\vskip10pt
+\begin{beamercolorbox}[rounded=true,sep=8pt,wd=\textwidth]{block body}
+  {\footnotesize\color{navy}\textbf{Takeaway:} reconstruction errors degrade synaptic statistics first --- global wiring stays intact. False-positive errors are consistently more disruptive than missed synapses at the same rate.}
+\end{beamercolorbox}
+\end{frame}
+
+\end{document}
