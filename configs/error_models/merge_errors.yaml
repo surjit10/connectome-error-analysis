@@ -1,0 +1,37 @@
+# ---------------------------------------------------------------------------
+# Merge Errors (EM5) Error Model Configuration
+# ---------------------------------------------------------------------------
+# Consumed by modules.error_models.merge_errors.model.MergeErrorsModel._perturb()
+#
+# Scientific interpretation (docs/error model/em5/method plan.md):
+#   error_rate = fraction of ELIGIBLE NEURONS that participate in a merge.
+#   k = round(0.5 * error_rate * n_eligible)  # pairs to merge
+#
+# Parameter classification per the methodology:
+#   - region_constraint / soma_side_constraint : Stage 1 hard anatomical
+#     constraints (same keys EM2 already consumes — no new architecture).
+#   - degree_threshold                         : QUALITY FLOOR only, NOT
+#     scientific eligibility.
+#   - min_shared_partners / jaccard_min        : Stage 2 calibration values
+#     (the scientific condition is shared partners >= 1).
+#   - top_k_per_neuron / max_retries           : implementation bounds.
+# ---------------------------------------------------------------------------
+
+error_model: merge_errors
+
+error_rate: 0.05
+
+# Stage 1 — hard anatomical constraints (mirrors EM2's existing keys).
+region_constraint: true
+soma_side_constraint: true
+
+# Quality floor (implementation rule, not scientific eligibility).
+degree_threshold: 10
+
+# Stage 2 — graph-based candidate ranking calibration values.
+min_shared_partners: 3
+jaccard_min: 0.001
+
+# Implementation bounds.
+top_k_per_neuron: 50
+max_retries: 20

@@ -12,18 +12,33 @@ Because connectome reconstruction is inherently imperfect — errors arise durin
 
 ## 2. What distinguishes "missed" from "false" synapses?
 
-Two independent error classes:
+Two independent error classes with entirely different code paths:
 
-- **Missed synapses (false negatives):** genuine connections that the reconstruction fails to detect. We model per-synapse survival as an independent binomial trial with probability (1 − rate); edge weight becomes the surviving count, and an edge is removed only if its weight reaches zero.
-- **False synapses (false positives):** connections that do not exist biologically but appear in the reconstruction. We add k = rate × edge_count artificial edges, each weighted from the empirical distribution of weak edges (≤5 synapses).
+**Missed synapses (false negatives) — `modules/error_models/missed_synapses/model.py`:**
 
-They are complementary failure modes with different graph signatures, which is why we test them separately.
+1. **Preprocessing (Phases 012–014):** Each edge's `raw_vulnerability_score` is computed as a weighted linear combination of three inverted, min-max-normalised biological features: synapse count, source-neuron degree, and target-neuron degree — edges with few synapses connecting low-degree neurons score highest. The `ProbabilityCalibrator` (Phase 014) then scales these scores with an iterative mass-redistribution algorithm so that the expected synapse loss matches the target error rate exactly, producing a `calibrated_removal_probability` per edge.
+
+2. **Perturbation (Phase 015):** For every edge, the code draws `surviving_synapses = rng.binomial(n=syn_count, p=1.0 - calibrated_removal_probability)`. An edge is **deleted** only if `surviving_synapses == 0`; otherwise its weight is updated to the surviving count. After sampling, the code verifies that the achieved removal rate is within ±0.5 percentage points of the target.
+
+**False synapses (false positives) — `modules/error_models/false_synapses/model.py`:**
+
+1. **Preprocessing (one-time, `CandidateGenerator`):** For each anatomical region the code builds an **inverted successor index** (postsynaptic target → list of its presynaptic neurons). Every pair (pre_a, pre_b) that share at least one common postsynaptic target and do **not** already form an edge is kept as a candidate. Each candidate is scored by `jaccard_out = |succ(pre_a) ∩ succ(pre_b)| / |succ(pre_a) ∪ succ(pre_b)|`. Pairs with `jaccard_out < 0.001` are discarded. The top-K per region (default: `50 × region_size`) are written to `candidates.parquet`.
+
+2. **Perturbation (per trial):** The code computes `k = round(error_rate × total_edges)` — the number of false edges to inject. It takes a sampling pool of `min(len(candidates), max(k×2, 1000))` top candidates, then draws k without replacement, with sampling probability proportional to `jaccard_out`. Each selected candidate gets a weight sampled uniformly from the empirical distribution of real edges with `syn_count ≤ 5` (≈71.5% of BANC edges). The resulting `(pre_root_id, post_root_id, weight)` triples are returned in `result.added_edges` — the baseline graph is **never mutated**.
+
+They are complementary failure modes: missed synapses reduce edge weights via binomial thinning, false synapses inject new structurally plausible edges ranked by Jaccard connectivity overlap.
 
 ---
 
 ## 3. Why is synapse loss exactly proportional to the error rate?
 
-By construction, not by coincidence. The missed-synapse model applies an independent binomial survival trial to every synapse with success probability (1 − rate). In expectation, and closely in practice (within 0.01%), the fraction of removed synapses equals the rate. This was a deliberate design choice: the model behaves as an unbiased random process, so any downstream distortion is attributable to the error itself, not to model artifacts.
+By construction, not by coincidence — and enforced at two levels in the code:
+
+1. **Calibration (Phase 014, `ProbabilityCalibrator.calibrate`):** Before any trial runs, the calibrator sets a global scaling factor `alpha = target_synapse_drops / (raw_vulnerability × syn_count).sum()` and then multiplies each edge's raw vulnerability score by alpha to produce `calibrated_removal_probability`. If any edge's probability exceeds 1.0, it is clamped to 1.0 and the residual mass is redistributed to uncapped edges in a loop (up to 50 iterations, convergence tolerance 1e-6). This guarantees that `sum(calibrated_removal_probability × syn_count) ≈ target_error_rate × total_synapses` before sampling begins.
+
+2. **Quality control (Phase 015, `MissedSynapsesModel._perturb`):** After binomial sampling, the code computes `achieved_error_rate = (total_original - total_surviving) / total_original` and raises a `RuntimeError` if the deviation from the target exceeds the configured tolerance (default ±0.5 percentage points). This is a hard rejection gate, not just a log warning.
+
+The achieved rate lands within 0.01% of the target in practice because the calibrated probabilities are precisely constructed to make the binomial expectation hit the target, and the large sample size (millions of synapses) means variance around that expectation is negligible.
 
 ---
 
