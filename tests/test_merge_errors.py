@@ -875,8 +875,19 @@ class TestFullPipeline:
         assert pert["total_synapses"] == base["total_synapses"] - 5
 
     def test_pagerank_vectors_aligned_in_merged_space(self, merge_dataset) -> None:
-        """Both baseline and perturbed pagerank vectors must end up of length
-        vcount - k and positionally aligned (the alignment integration)."""
+        """Alignment integration test.
+
+        After _align_pagerank_vectors:
+        - baseline_analysis_results["pagerank"]["pagerank_scores"] is the
+          collapsed baseline (length vcount - k).
+        - analysis_results["pagerank"] no longer contains "pagerank_scores"
+          (the raw vector is removed to prevent the broken positional comparison).
+        - analysis_results["pagerank"] contains scalar comparison metrics:
+          pagerank_scores_pearson, pagerank_scores_spearman,
+          pagerank_scores_topk_overlap.
+        - The sum rule holds: the merged slot in the collapsed baseline equals
+          the sum of the two sources' baseline PageRank scores.
+        """
         from core.merge_experiment_runner import MergeExperimentRunner
         from modules.error_models import registry as error_registry
         from modules.graph_analyses.analysis_registry import (
@@ -891,22 +902,50 @@ class TestFullPipeline:
             baseline_analysis_names=["basic_structure", "pagerank"],
         ))
         assert result.succeeded, result.errors
+
+        # Collapsed baseline vector must be present with correct length.
         base_vec = None
-        pert_vec = None
         for a_res in result.baseline_analysis_results:
             if a_res.analysis_name == "pagerank":
-                base_vec = a_res.metrics["pagerank_scores"]
+                base_vec = a_res.metrics.get("pagerank_scores")
+        assert base_vec is not None, "Collapsed baseline pagerank_scores must be present"
+        # 13-node test dataset, 1 merge pair -> 12 aligned slots.
+        assert len(base_vec) == 12
+
+        # Raw perturbed vector must have been REMOVED (replaced by scalars).
+        pert_pr_metrics = None
         for a_res in result.analysis_results:
             if a_res.analysis_name == "pagerank":
-                pert_vec = a_res.metrics["pagerank_scores"]
-        assert base_vec is not None and pert_vec is not None
-        assert len(base_vec) == len(pert_vec) == 12
-        # The merged pair's collapsed baseline mass is the sum of its two
-        # sources: slot 0 (root 1000, first source) holds pagerank(1000) +
-        # pagerank(2000), which is > 0.
+                pert_pr_metrics = a_res.metrics
+        assert pert_pr_metrics is not None
+        assert "pagerank_scores" not in pert_pr_metrics, (
+            "Raw pagerank_scores must be removed from analysis_results after "
+            "per-trial comparison — it would produce a positionally-invalid "
+            "comparison against the unaligned 0%-rate baseline"
+        )
+
+        # Scalar comparison keys must be present and valid.
+        for scalar_key in (
+            "pagerank_scores_pearson",
+            "pagerank_scores_spearman",
+            "pagerank_scores_topk_overlap",
+        ):
+            assert scalar_key in pert_pr_metrics, (
+                f"Scalar comparison metric '{scalar_key}' missing from "
+                "pagerank analysis_results"
+            )
+            val = pert_pr_metrics[scalar_key]
+            assert isinstance(val, float), f"{scalar_key} must be float"
+
+        # Sum rule: the merged slot (root 1000 = first source of the pair
+        # (1000, 2000)) in the collapsed baseline must equal
+        # pagerank(1000) + pagerank(2000) from the original baseline.
         baseline = result.prepared_graph
         idx = baseline.lookup.id_to_idx
-        merged_sum = base_vec[idx[1000]]  # collapsed slot holds a + b
+        # baseline_analysis_results was run on the unmodified graph; the
+        # collapse happened afterward, so slot idx[1000] in the COLLAPSED
+        # vector holds pr(1000)+pr(2000).
+        merged_sum = base_vec[idx[1000]]
         assert merged_sum > 0
 
     def test_reproducibility_full_pipeline(self, merge_dataset) -> None:

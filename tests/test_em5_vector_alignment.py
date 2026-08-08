@@ -211,19 +211,43 @@ class TestPipelineAlignment:
         pagerank_analysis = analysis_registry.instantiate("pagerank")
         base_res = pagerank_analysis.execute(prepared, config={})
         pert_res = pagerank_analysis.execute(temp_prepared, config={})
+
+        # Simulate baseline_analysis_names=["pagerank"]:
+        # the baseline pagerank lands in baseline_analysis_results.
         result.baseline_analysis_results.append(base_res)
         result.analysis_results.append(pert_res)
 
-        runner._align_pagerank_vectors(result, prepared, error_result.extra["merge_plan"], temp_graph)
+        runner._align_pagerank_vectors(
+            result, prepared, error_result.extra["merge_plan"], temp_graph
+        )
 
+        # After alignment, the baseline vector should be collapsed.
         base_vec = result.baseline_analysis_results[0].metrics["pagerank_scores"]
-        pert_vec = result.analysis_results[0].metrics["pagerank_scores"]
         # 7 baseline vertices - 1 merge = 6 aligned slots.
-        assert len(base_vec) == len(pert_vec) == 6
-        # The merged pair's collapsed baseline mass equals the merged vertex's
-        # score only approximately (renormalisation), but the vectors must be
-        # equal length and finite.
-        assert all(v >= 0 for v in pert_vec)
+        assert len(base_vec) == 6
+        assert all(v >= 0 for v in base_vec)
+
+        # The raw perturbed vector must have been replaced by scalar comparison
+        # metrics.  The raw pagerank_scores key should no longer be present
+        # (it was removed to prevent the broken positional vector pathway).
+        pert_metrics = result.analysis_results[0].metrics
+        assert "pagerank_scores" not in pert_metrics, (
+            "Raw pagerank_scores must be removed after per-trial comparison"
+        )
+
+        # The three aligned comparison scalars must be present and valid.
+        for scalar_key in (
+            "pagerank_scores_pearson",
+            "pagerank_scores_spearman",
+            "pagerank_scores_topk_overlap",
+        ):
+            assert scalar_key in pert_metrics, f"Missing scalar: {scalar_key}"
+            val = pert_metrics[scalar_key]
+            assert isinstance(val, float), f"{scalar_key} must be float, got {type(val)}"
+            assert -1.0 <= val <= 1.0 or 0.0 <= val <= 1.0, (
+                f"{scalar_key}={val} out of range"
+            )
+
 
 
 # ---------------------------------------------------------------------------

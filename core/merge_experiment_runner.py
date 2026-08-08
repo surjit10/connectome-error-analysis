@@ -286,12 +286,32 @@ class MergeExperimentRunner:
         temp_graph: igraph.Graph,
     ) -> None:
         """Replace the PageRank vectors (baseline AND perturbed) with
-        aligned ones in the merged coordinate space.
+        aligned ones in the merged coordinate space, then immediately compute
+        per-trial comparison metrics from those aligned vectors.
 
         Called immediately after analyses complete and before the temporary
         graph is destroyed.  Only the ``pagerank_scores`` metric of the
         ``pagerank`` analysis is touched; every other metric continues to
         flow through the existing pipeline untouched.
+
+        Three phases:
+
+        1. **Collapse baseline** — ``collapse_baseline_vector`` sums the two
+           source neurons' scores into one merged slot (sum rule already
+           defined in ``core.merge_vector_alignment``).
+        2. **Reindex perturbed** — ``reindex_temp_vector`` places each merged
+           vertex's score into the same merged slot.
+        3. **Per-trial comparison** — Pearson, Spearman and top-K overlap are
+           computed *here*, between the two correctly-aligned vectors, and
+           stored as plain float scalars in ``result.analysis_results`` using
+           the same key convention the vector pathway would have produced
+           (``pagerank_scores_pearson`` / ``pagerank_scores_spearman`` /
+           ``pagerank_scores_topk_overlap``).
+           The raw ``pagerank_scores`` vector is then *removed* from
+           ``result.analysis_results`` so the shared ``StatisticsEngine``
+           vector pathway — which has no knowledge of the merge mapping and
+           would compare positionally against the 0%-rate unaligned baseline
+           of a different length — cannot produce a second, invalid result.
 
         All logic lives in the EM5-only helper
         :mod:`core.merge_vector_alignment`; the shared framework modules are
@@ -313,6 +333,7 @@ class MergeExperimentRunner:
         temp_root_to_index = build_temp_root_to_index(temp_graph)
         merged_order = build_merged_order(id_map, vcount, merge_plan)
 
+        # ── Phase 1: Collapse baseline into merged space ──────────────────
         for a_res in result.baseline_analysis_results:
             if a_res.analysis_name != "pagerank":
                 continue
@@ -328,6 +349,7 @@ class MergeExperimentRunner:
                 len(vector), len(merged_order),
             )
 
+        # ── Phase 2: Reindex perturbed vector into merged space ───────────
         for a_res in result.analysis_results:
             if a_res.analysis_name != "pagerank":
                 continue
@@ -342,6 +364,86 @@ class MergeExperimentRunner:
                 "into merged space: %d -> %d entries.",
                 len(vector), len(merged_order),
             )
+
+        # ── Phase 3: Per-trial comparison on the aligned vectors ──────────
+        # Both vectors are now in the same merged coordinate space.  Compute
+        # Pearson, Spearman and top-K overlap *now*, before the temp graph is
+        # destroyed, and store them as scalar metrics so the StatisticsEngine
+        # scalar pathway aggregates them correctly across trials.
+        #
+        # The raw ``pagerank_scores`` vector is then removed from
+        # ``analysis_results`` so the StatisticsEngine vector pathway cannot
+        # run a second, positionally-invalid comparison: the vector pathway
+        # has no merge-mapping knowledge and would compare the merged-space
+        # perturbed vector (length vcount−k) against an averaged baseline
+        # vector of full length (vcount), producing misleading metrics via
+        # silent zip-truncation.
+        from modules.statistical_evaluation.vector_comparison import (
+            compare_pagerank,
+        )
+
+        # Build a lookup: analysis_name → collapsed baseline vector.
+        collapsed_by_name: Dict[str, list] = {}
+        for b_res in result.baseline_analysis_results:
+            if b_res.analysis_name == "pagerank":
+                bv = b_res.metrics.get("pagerank_scores")
+                if bv is not None:
+                    collapsed_by_name["pagerank"] = list(bv)
+
+        if not collapsed_by_name:
+            logger.warning(
+                "[MergeExperimentRunner] No collapsed baseline pagerank vector "
+                "found in baseline_analysis_results.  Per-trial comparison "
+                "scalars will not be computed.  Ensure ExperimentConfig sets "
+                "baseline_analysis_names=[\"pagerank\"]."
+            )
+
+        top_k = 100  # matches StatisticsEngine / vector_comparison defaults
+        comparison_cfg = {"top_k_overlap": top_k}
+
+        for a_res in result.analysis_results:
+            if a_res.analysis_name != "pagerank":
+                continue
+            collapsed_baseline = collapsed_by_name.get("pagerank")
+            if collapsed_baseline is None:
+                # baseline_analysis_names not configured — skip scalar phase.
+                continue
+            perturbed_vec = a_res.metrics.get("pagerank_scores")
+            if perturbed_vec is None:
+                continue
+
+            try:
+                comparison = compare_pagerank(
+                    collapsed_baseline, list(perturbed_vec), comparison_cfg
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "[MergeExperimentRunner] Per-trial aligned pagerank "
+                    "comparison failed: %s", exc
+                )
+                continue
+
+            # Store scalars with the same naming convention the vector
+            # pathway would have produced, so the evaluation layer sees
+            # consistent keys across rates.
+            # Vector pathway convention: f"{metric_key}_{derived_key}"
+            #   metric_key = "pagerank_scores"
+            #   derived_key = "pearson" | "spearman" | "topk_overlap"
+            for comp_key, comp_val in comparison.items():
+                a_res.metrics[f"pagerank_scores_{comp_key}"] = float(comp_val)
+
+            logger.info(
+                "[MergeExperimentRunner] Per-trial aligned PageRank: "
+                "pearson=%.4f  spearman=%.4f  topk=%.4f  (merged-space len=%d)",
+                comparison.get("pearson", float("nan")),
+                comparison.get("spearman", float("nan")),
+                comparison.get("topk_overlap", float("nan")),
+                len(perturbed_vec),
+            )
+
+            # Remove the raw vector so the StatisticsEngine vector pathway
+            # skips this metric entirely (no vector → no comparison).
+            del a_res.metrics["pagerank_scores"]
 
     # ------------------------------------------------------------------ #
     # EM5-specific temporary graph construction (isolated stage)            #

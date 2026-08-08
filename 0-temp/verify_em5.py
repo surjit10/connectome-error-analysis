@@ -82,6 +82,8 @@ def main() -> None:
                 error_model_name="merge_errors",
                 error_model_config={"error_rate": rate, **ERROR_MODEL_CONFIG},
                 analysis_names=ANALYSES,
+                # Baseline pagerank required for EM5 merge-aware alignment.
+                baseline_analysis_names=["pagerank"],
                 preprocessing_config={
                     "features": {"degree": True, "synapse_counts": True}
                 },

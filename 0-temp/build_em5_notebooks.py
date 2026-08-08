@@ -317,6 +317,11 @@ for err_rate in EXPERIMENT['error']['rates']:
                 **EXPERIMENT['error']['config'],
             },
             analysis_names=EXPERIMENT['analysis'],
+            # Baseline pagerank is required for EM5 merge-aware vector alignment.
+            # _align_pagerank_vectors() collapses this vector into the merged
+            # coordinate space before computing per-trial Pearson/Spearman/Top-K,
+            # so the comparison is neuron-ID-aware rather than positional.
+            baseline_analysis_names=['pagerank'],
             preprocessing_config={'features': {'degree': True, 'synapse_counts': True}},
             seed=seed,
             output_root=str(trial_out) if EXPERIMENT['export']['save_statistics'] else None,
@@ -549,6 +554,8 @@ for err_rate in EXPERIMENT['error']['rates']:
             error_model_name=err_model,
             error_model_config={'error_rate': err_rate, **EXPERIMENT['error']['config']},
             analysis_names=EXPERIMENT['analysis'],
+            # Baseline pagerank required for EM5 merge-aware vector alignment.
+            baseline_analysis_names=['pagerank'],
             preprocessing_config={'features': {'degree': True, 'synapse_counts': True}},
             seed=seed,
             output_root=str(trial_out) if EXPERIMENT['export']['save_statistics'] else None,
