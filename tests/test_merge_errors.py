@@ -106,6 +106,30 @@ def build_merge_pair_graph() -> igraph.Graph:
     return _finalise(g, root_ids)
 
 
+def build_parallel_merge_pair_graph() -> igraph.Graph:
+    """Pair (1000, 2000) with PARALLEL same-pair edges: THREE physical
+    1000->2000 edges (weights 5, 3, 2) plus one 2000->1000 edge (weight 4),
+    and shared partners X1..X3 so the pair is a valid candidate.
+
+    Indices: 1000=0, 2000=1, X1..X3 (roots 1..3)=2..4.
+    Baseline: 5 vertices, 10 edges, 20 synapses.
+    """
+    root_ids = [1000, 2000] + list(range(1, 4))
+    g = igraph.Graph(directed=True)
+    g.add_vertices(len(root_ids))
+    g.vs["root_id"] = root_ids
+    edges = []
+    for x in range(2, 5):
+        edges.append((0, x))   # 1000 -> X1..X3
+        edges.append((1, x))   # 2000 -> X1..X3
+    edges += [(0, 1), (0, 1), (0, 1)]   # 3x parallel A->B
+    edges.append((1, 0))                # B->A
+    g.add_edges(edges)
+    # Per-edge weights: 6 partner edges (w=1), then 5, 3, 2, then 4.
+    g.es["syn_count"] = [1] * 6 + [5, 3, 2, 4]
+    return _finalise(g, root_ids)
+
+
 def build_two_pairs_graph() -> igraph.Graph:
     """Two disjoint merge pairs: (1000, 2000) sharing X1..X3 and
     (3000, 4000) sharing Z1..Z3.  n_eligible = 4.
@@ -307,10 +331,10 @@ class TestMergeModel:
         prepared = _prepared(build_two_pairs_graph())
         model = registry.instantiate("merge_errors")
 
-        def fake_merge_stats(self, lookup, a, b):
+        def fake_merge_stats(self, prepared, a, b):
             # _merge_stats is a regular method; call it unbound with a
             # placeholder self (the real implementation ignores self).
-            stats = MergeErrorsModel._merge_stats(None, lookup, a, b)
+            stats = MergeErrorsModel._merge_stats(None, prepared, a, b)
             stats["merge_id"] = -42  # force a collision on the second pair
             return stats
 
@@ -354,6 +378,27 @@ class TestMergeModel:
         assert entry["self_loops_dropped"] == 1          # 1000 -> 2000
         assert entry["internal_synapses_dropped"] == 5
         assert entry["edges_reattached"] == 20           # 21 incident - 1 loop
+
+    def test_merge_plan_edge_exact_on_parallel_edges(self) -> None:
+        """BANC-family graphs contain PARALLEL edges (multiple connection
+        rows per directed pair).  The plan must count every physical
+        same-pair edge, not one per direction: 3x parallel 1000->2000
+        (weights 5, 3, 2) + 2000->1000 (weight 4) = 4 self-loops, 14
+        synapses.  Re-attached: 6 partner edges -> 3 distinct remapped keys
+        -> 3 parallel collapses."""
+        from modules.error_models import registry
+
+        prepared = _prepared(build_parallel_merge_pair_graph())
+        model = registry.instantiate("merge_errors")
+        result = model.execute(prepared, config=_cfg(), seed=42)
+        assert result.succeeded
+        plan = result.extra["merge_plan"]
+        assert len(plan) == 1
+        entry = next(iter(plan.values()))
+        assert entry["self_loops_dropped"] == 4            # 3x A->B + B->A
+        assert entry["internal_synapses_dropped"] == 14    # 5+3+2+4
+        assert entry["edges_reattached"] == 6             # 6 partner edges
+        assert entry["parallel_pairs_collapsed"] == 3     # 6 edges -> 3 keys
 
     def test_region_constraint_excludes_cross_region(self) -> None:
         from modules.error_models import registry
@@ -598,6 +643,39 @@ class TestTempGraphConstruction:
             for e in temp.es if e.source == m_idx
         }
         assert weights[1] == 5  # X1 (root 1)
+
+    def test_plan_and_runner_agree_on_parallel_edges(self) -> None:
+        """The plan's edge-exact accounting must equal what the runner
+        actually does on a graph with parallel same-pair edges (the case
+        that used to log 'Self-loop bookkeeping mismatch: runner dropped 4,
+        plan recorded 2'): the temp graph drops exactly the plan's self-loop
+        count and synapses, and the runner records the exact totals back
+        into perturbation_metadata."""
+        prepared = _prepared(build_parallel_merge_pair_graph())
+        baseline = prepared.graph
+        base_edges = baseline.ecount()
+        base_syn = sum(baseline.es["syn_count"])
+
+        err = self._build_runner_result(prepared)
+        plan = err.extra["merge_plan"]
+        entry = next(iter(plan.values()))
+        assert entry["self_loops_dropped"] == 4
+        assert entry["internal_synapses_dropped"] == 14
+        assert entry["parallel_pairs_collapsed"] == 3
+
+        temp, _ = self._temp_graph(prepared, err)
+        assert temp is not None
+        assert temp.ecount() == base_edges - 4 - 3           # drops + collapses
+        assert sum(temp.es["syn_count"]) == base_syn - 14
+        loops = [e.index for e in temp.es if temp.is_loop(e.index)]
+        assert loops == []
+
+        # The runner writes the exact totals into the metadata (the plan is
+        # destroyed after the trial; the metadata is what exports read).
+        meta = err.perturbation_metadata
+        assert meta["self_loops_dropped"] == 4
+        assert meta["internal_synapses_dropped"] == 14
+        assert meta["parallel_pairs_collapsed"] == 3
 
     def test_self_loops_removed(self, merge_pair_prepared) -> None:
         err = self._build_runner_result(merge_pair_prepared)

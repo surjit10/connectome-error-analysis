@@ -274,7 +274,7 @@ class MergeErrorsModel(BaseErrorModel):
         total_self_loops = 0
         total_internal_synapses = 0
         for a, b, _jac in selected:
-            stats = self._merge_stats(lookup, a, b)
+            stats = self._merge_stats(prepared, a, b)
             mid = stats["merge_id"]
             if mid in merge_plan:
                 raise ValueError(
@@ -577,50 +577,92 @@ class MergeErrorsModel(BaseErrorModel):
 
     def _merge_stats(
         self,
-        lookup: Any,
+        prepared: PreparedGraph,
         a: int,
         b: int,
     ) -> Dict[str, Any]:
-        """Descriptive per-pair statistics (the runner recomputes edges from
-        the baseline graph, which remains the source of truth).
+        """Per-pair merge statistics, computed edge-exactly from the igraph.
 
-        Assumes a simple graph (at most one edge per directed endpoint
-        pair), which holds for all BANC-family datasets the framework
-        consumes.  ``parallel_pairs_collapsed`` counts unique shared-partner
-        pairs (set intersection); on a graph with true multi-edges the
-        runner's occurrence-based collapse would count more, so the simple-
-        graph assumption is part of the accounting contract.
+        This is the descriptive counterpart of the runner's re-attachment
+        logic, so the two can never disagree.  Every **physical** edge is
+        counted (the BANC-family datasets contain parallel edges: multiple
+        connection rows for the same directed pair), so ``self_loops_dropped``
+        is the exact number of edges the runner removes, not the number of
+        distinct directions.
+
+        Accounting contract (matches the runner exactly):
+
+        - ``self_loops_dropped``: edges whose **both** endpoints lie inside
+          ``{a, b}`` (A->B, B->A, and any baseline self-loops on a or b).
+          Each physical edge counts once — parallel A->B edges count
+          individually.
+        - ``internal_synapses_dropped``: sum of the ``syn_count`` weights of
+          exactly those dropped edges (per-edge, so parallel edges sum their
+          weights instead of collapsing to one).
+        - ``edges_reattached``: physical edges touching a or b with at least
+          one endpoint outside the pair; each counted once.
+        - ``parallel_pairs_collapsed``: ``edges_reattached`` minus the number
+          of **distinct** remapped ``(src, dst)`` keys (a and b both remap to
+          the merged vertex).  On a simple graph this reduces to the number
+          of shared-partner directions ``|succ_a ∩ succ_b| + |pred_a ∩ pred_b|``
+          (unchanged behaviour); on a graph with parallel edges it also
+          counts multiplicity collapses.  Edges between two *different*
+          merge pairs are seen by both pairs, so the per-pair value can
+          double-count their multiplicity; the runner records the exact
+          global collapse total into ``perturbation_metadata`` after
+          construction, which is the authoritative number.
         """
-        succ_a = set(lookup.successors.get(a, []))
-        pred_a = set(lookup.predecessors.get(a, []))
-        succ_b = set(lookup.successors.get(b, []))
-        pred_b = set(lookup.predecessors.get(b, []))
+        graph = prepared.graph
+        lookup = prepared.lookup
+        ia = lookup.id_to_idx.get(a)
+        ib = lookup.id_to_idx.get(b)
+        if ia is None or ib is None:
+            # Cannot occur for pairs sampled from lookup.node_set, but mirror
+            # the runner's defensive guard: return zeroed stats instead of
+            # crashing on graph.incident(None).
+            return {
+                "merge_id": _merge_id(a, b),
+                "source_ids": [a, b],
+                "edges_reattached": 0,
+                "parallel_pairs_collapsed": 0,
+                "self_loops_dropped": 0,
+                "internal_synapses_dropped": 0,
+            }
 
-        parallel_collapsed = len(succ_a & succ_b) + len(pred_a & pred_b)
+        weight_attr = (
+            "syn_count" if "syn_count" in graph.edge_attributes()
+            else ("weight" if "weight" in graph.edge_attributes() else None)
+        )
 
-        edge_weight = lookup.edge_weight
+        # Every physical edge incident to either absorbed neuron (once).
+        incident_idx: set = set(graph.incident(ia, mode="all"))
+        incident_idx |= set(graph.incident(ib, mode="all"))
+
         self_loops = 0
         internal_synapses = 0
-        if b in succ_a:
-            self_loops += 1
-            w = edge_weight.get((a, b))
-            internal_synapses += int(w) if w is not None else 0
-        if a in succ_b:
-            self_loops += 1
-            w = edge_weight.get((b, a))
-            internal_synapses += int(w) if w is not None else 0
-
-        # Each directed incident edge is counted once per endpoint it touches.
-        # An A<->B self-loop edge appears twice in ``incident`` (once as a
-        # successor of one side, once as a predecessor of the other) and is
-        # dropped after the merge, so it must be subtracted twice.
-        incident = len(succ_a) + len(pred_a) + len(succ_b) + len(pred_b)
+        edges_reattached = 0
+        remapped_keys: set = set()
+        for eidx in incident_idx:
+            e = graph.es[eidx]
+            s_root = graph.vs[e.source]["root_id"]
+            t_root = graph.vs[e.target]["root_id"]
+            in_pair = (e.source in (ia, ib)) and (e.target in (ia, ib))
+            if in_pair:
+                self_loops += 1
+                if weight_attr is not None:
+                    w = e[weight_attr]
+                    internal_synapses += int(w) if w is not None else 0
+            else:
+                edges_reattached += 1
+                ks = "M" if e.source in (ia, ib) else s_root
+                kt = "M" if e.target in (ia, ib) else t_root
+                remapped_keys.add((ks, kt))
 
         return {
             "merge_id": _merge_id(a, b),
             "source_ids": [a, b],
-            "edges_reattached": incident - 2 * self_loops,
-            "parallel_pairs_collapsed": parallel_collapsed,
+            "edges_reattached": edges_reattached,
+            "parallel_pairs_collapsed": edges_reattached - len(remapped_keys),
             "self_loops_dropped": self_loops,
             "internal_synapses_dropped": internal_synapses,
         }

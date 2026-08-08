@@ -198,8 +198,24 @@ def main() -> None:
                     loops = [e.index for e in temp_g.es if temp_g.is_loop(e.index)]
                     if loops:
                         failures.append(f"{tag}: {len(loops)} self-loops in temp graph")
-                    if temp_g.has_multiple():
-                        failures.append(f"{tag}: multi-edges in temp graph")
+                    # Multi-edge check applies only to edges incident to the
+                    # merged vertices (re-attached edges must be simple).  The
+                    # baseline's own parallel edges between non-absorbed
+                    # vertices are legitimate and remain untouched.
+                    merged_idx = {temp_g["id_to_idx"][mid] for mid in plan}
+                    seen_keys = set()
+                    multi_incident = []
+                    for e in temp_g.es:
+                        if e.source in merged_idx or e.target in merged_idx:
+                            key = (e.source, e.target)
+                            if key in seen_keys:
+                                multi_incident.append(e.index)
+                            seen_keys.add(key)
+                    if multi_incident:
+                        failures.append(
+                            f"{tag}: {len(multi_incident)} multi-edges incident "
+                            "to merged vertices"
+                        )
 
                     # Lookup consistency: id_to_idx/id_map mutual inverses.
                     id2i = temp_g["id_to_idx"]

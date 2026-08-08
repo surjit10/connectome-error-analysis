@@ -383,7 +383,9 @@ Every perturbation must satisfy:
 - Total synapse count preserved **except** the recorded
   `internal_synapses_dropped` from self-loop removal (asserted exactly).
 - No self-loops.
-- No multi-edges (all parallel pairs collapsed).
+- No multi-edges **introduced by the merge** (all merge-induced parallel
+  pairs are collapsed with summed synapse counts).  Pre-existing parallel
+  edges between non-absorbed neurons are legitimate and remain untouched.
 - No duplicate / invalid root IDs.
 
 **Synthetic-ID uniqueness**

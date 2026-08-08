@@ -500,6 +500,7 @@ class MergeExperimentRunner:
             final_edges: Dict[Tuple[Any, Any], Dict[str, Any]] = {}
             self_loops_dropped = 0
             internal_synapses_dropped = 0
+            captured_reattached = 0
 
             for merge_id, partner_root, outgoing, attrs, is_selfloop in captured:
                 if is_selfloop:
@@ -520,6 +521,7 @@ class MergeExperimentRunner:
                     # after the same-pair drop above).
                     self_loops_dropped += 1
                     continue
+                captured_reattached += 1
                 key = (src_root, dst_root)
                 if key in final_edges:
                     # Parallel collapse: sum the weight; keep the first edge's
@@ -581,7 +583,27 @@ class MergeExperimentRunner:
             )
             temp_prepared.baseline_features = prepared.baseline_features
 
+            # ── Record exact accounting into the error-model metadata ────
+            # The runner is the source of truth for the actual graph mutation.
+            # ``self_loops_dropped`` / ``internal_synapses_dropped`` match the
+            # plan's edge-exact per-pair values, but the global parallel-
+            # collapse total can only be computed here: an edge between two
+            # DIFFERENT merged pairs is seen by both pairs' per-pair views, so
+            # only the runner knows the deduplicated collapse count.  Writing
+            # the exact totals here keeps every downstream consumer (exports,
+            # verification) consistent on datasets with parallel edges.
+            if error_result is not None and error_result.perturbation_metadata:
+                meta = error_result.perturbation_metadata
+                meta["self_loops_dropped"] = self_loops_dropped
+                meta["internal_synapses_dropped"] = internal_synapses_dropped
+                meta["parallel_pairs_collapsed"] = (
+                    captured_reattached - len(final_edges)
+                )
+
             # ── Consistency QC: dropped self-loops match the plan ────────
+            # Regression guard.  The plan's ``_merge_stats`` counts the same
+            # physical same-pair edges (edge-exact), so any mismatch now
+            # signals a genuine regression, not parallel-edge noise.
             planned_dropped = sum(
                 plan.get("self_loops_dropped", 0) for plan in merge_plan.values()
             )
