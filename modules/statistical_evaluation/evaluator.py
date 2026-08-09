@@ -189,31 +189,67 @@ class StatisticalEvaluator:
         Merge derived vector comparison metrics into *eval_metrics*.
 
         Each derived scalar (e.g. ``pagerank_scores_spearman``) gets a
-        :class:`MetricEvaluation` with Cohen's d computed against the null
-        hypothesis (0 = no correlation / no distribution shift).
+        :class:`MetricEvaluation` with Cohen's d computed against the *actual*
+        baseline vector-comparison reference — i.e. the value the similarity
+        metric takes when the perturbed graph equals the baseline graph.
+
+        For Spearman / Pearson this reference is ≈ 1.0; for KS / Wasserstein
+        it is ≈ 0.0.  Using these real references instead of a hardcoded 0.0
+        prevents astronomically large d values for high-correlation metrics.
 
         Note: vector-derived metric keys (e.g. ``pagerank_scores_pearson``)
         are distinct from the original scalar metric keys, so there is no
         risk of collision with the existing scalar evaluation pathway.
         """
+        # ── Compute baseline vector-comparison reference ─────────────────
+        # Run the same strategy on baseline vs. itself to get the reference
+        # distribution of each similarity metric at 0% error.
+        from core.statistics_engine import StatisticsEngine
+        _engine = StatisticsEngine()
+        baseline_self_comparisons: Dict[str, Dict[str, MetricStats]] = {}
+        try:
+            baseline_self_comparisons = _engine.compute_vector_comparisons(
+                baseline_stats,
+                baseline_stats,
+                config=self.config,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "[StatisticalEvaluator] Could not compute baseline self-comparison "
+                "for vector metrics: %s. Effect sizes will be set to 0.0.",
+                exc,
+            )
+
         for a_name, derived_dict in vector_comparisons.items():
             if a_name not in eval_metrics:
                 eval_metrics[a_name] = {}
 
+            b_analysis = baseline_self_comparisons.get(a_name, {})
+
             for d_key, d_mstat in derived_dict.items():
-                # Vector-derived metrics compare against the null hypothesis
-                # (0 = no effect).  For example, a Spearman of 0 means no
-                # rank correlation — Cohen's d measures how far the observed
-                # correlation is from 0.
-                d = _safe_cohens_d(
-                    d_mstat.mean, d_mstat.std, d_mstat.n,
-                    0.0, 0.0, 1,
-                )
+                b_mstat = b_analysis.get(d_key)
+
+                if b_mstat is not None and math.isfinite(b_mstat.mean):
+                    # Use the real baseline reference for Cohen's d and
+                    # downstream preservation calculations.
+                    d      = _safe_cohens_d(
+                        d_mstat.mean, d_mstat.std, d_mstat.n,
+                        b_mstat.mean, b_mstat.std, max(b_mstat.n, 1),
+                    )
+                    b_mean = b_mstat.mean
+                    b_std  = b_mstat.std
+                else:
+                    # Baseline reference unavailable: preserve the observed
+                    # metric but set d to 0.0 rather than produce a spurious
+                    # number.
+                    d      = 0.0
+                    b_mean = float("nan")
+                    b_std  = 0.0
 
                 eval_metrics[a_name][d_key] = MetricEvaluation(
                     metric_name=d_key,
-                    baseline_mean=0.0,
-                    baseline_std=0.0,
+                    baseline_mean=b_mean,
+                    baseline_std=b_std,
                     mean=d_mstat.mean,
                     std=d_mstat.std,
                     ci_lower=d_mstat.ci_lower,
