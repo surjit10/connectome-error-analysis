@@ -173,10 +173,16 @@ class SplitErrorsModel(BaseErrorModel):
                                   fid_2: [partner_root, ...]},
             "community_count": int,
             "fallback_used": bool,
-            "edges_rewired": int,
+            "edges_rewired": int,     # non-self incident edges rewired
+            "self_loops_dropped": int,  # autapse edges dropped (not rewired)
           },
           ...
         }
+
+    Self-loops (autapses) on a split centre are never partners of its own
+    fragments: they are excluded from the partition, dropped by the runner
+    and counted explicitly via ``self_loops_dropped`` (mirrors EM5's
+    self-loop bookkeeping).
 
     ``SplitExperimentRunner._split_build_temp_graph()`` consumes this plan to
     construct the temporary analysis graph (fragment vertices + rewired
@@ -266,6 +272,7 @@ class SplitErrorsModel(BaseErrorModel):
                 "neurons_split": 0,
                 "fragments_created": 0,
                 "edges_rewired": 0,
+                "self_loops_dropped": 0,
                 "neurons_rejected": 0,
                 "retries_used": 0,
             }
@@ -293,6 +300,7 @@ class SplitErrorsModel(BaseErrorModel):
         rejected: List[int] = []
         retries_used = 0
         edges_rewired_total = 0
+        self_loops_total = 0
 
         # ── Perturbation loop (with bounded rejection re-sampling) ───────
         attempt_queue: List[int] = list(sampled)
@@ -320,6 +328,7 @@ class SplitErrorsModel(BaseErrorModel):
 
             split_plan[idx_to_root[center_idx]] = split
             edges_rewired_total += split["edges_rewired"]
+            self_loops_total += split["self_loops_dropped"]
 
         if not split_plan:
             add_warning(
@@ -338,6 +347,7 @@ class SplitErrorsModel(BaseErrorModel):
             "neurons_split": len(split_plan),
             "fragments_created": 2 * len(split_plan),
             "edges_rewired": edges_rewired_total,
+            "self_loops_dropped": self_loops_total,
             "neurons_rejected": len(rejected),
             "retries_used": retries_used,
         }
@@ -401,9 +411,20 @@ class SplitErrorsModel(BaseErrorModel):
         fallback, Greedy Largest-First assignment, and fragment-quality
         validation.  Returns ``None`` when the neuron must be rejected
         (methodology section 20), otherwise a serialisable split description.
+
+        Self-loops (autapses) on the centre are excluded from the partner
+        partition (the centre is never a partner of its own fragments); they
+        are reported via ``self_loops_dropped`` and dropped by the runner.
         """
-        # 1-hop neighbourhood (unique partners).
+        # 1-hop neighbourhood (unique partners).  A self-loop (autapse) on
+        # the centre makes the neuron its own neighbour; the neuron is never
+        # a partner of its own fragments, so it is excluded here.  Without
+        # this, ``vs`` lists the centre twice and ``subgraph()`` deduplicates
+        # it — the partition then comes up one partner short and the
+        # exhaustive-partition validation below raises on any neuron with a
+        # self-loop (e.g. MANC v1.2.1, which has 42 autapse edges).
         neighbours = set(graph.neighbors(center_idx, mode="all"))
+        neighbours.discard(center_idx)
 
         # Impossibility / quality guards.
         if len(neighbours) < 2:
@@ -458,8 +479,17 @@ class SplitErrorsModel(BaseErrorModel):
         fid_2 = _fragment_id(root, 2)
 
         # Edge rewiring bookkeeping: every edge incident to the neuron is
-        # assigned to the fragment of its partner (section 18).
+        # assigned to the fragment of its partner (section 18).  Self-loop
+        # (autapse) edges are the exception — their partner is the centre
+        # itself, which is never a fragment partner — so they are dropped by
+        # the runner and counted explicitly.  igraph returns a self-loop
+        # twice from incident(mode="all"), so count unique edge ids.
         incident = graph.incident(center_idx, mode="all")
+        self_loop_ids = {
+            e for e in incident
+            if graph.es[e].source == center_idx
+            and graph.es[e].target == center_idx
+        }
 
         fragment_partners = {
             fid_1: [idx_to_root[i] for i in frag_1_global],
@@ -486,7 +516,10 @@ class SplitErrorsModel(BaseErrorModel):
             "fragment_partners": fragment_partners,
             "community_count": len(groups),
             "fallback_used": fallback_used,
-            "edges_rewired": len(incident),
+            # Physical non-self incident edges: ``set(incident)`` dedupes
+            # the self-loop that igraph returns twice.
+            "edges_rewired": len(set(incident)) - len(self_loop_ids),
+            "self_loops_dropped": len(self_loop_ids),
         }
 
 

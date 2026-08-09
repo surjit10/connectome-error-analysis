@@ -115,7 +115,15 @@ class StatisticalEvaluator:
         error_level = 0.0
         for r in perturbed_trials:
             if r.error_result and hasattr(r.error_result, "perturbation_metadata"):
-                error_level = float(r.error_result.perturbation_metadata.get("target_error_rate", 0.0))
+                # Models differ in the key they store: missed/split use
+                # "target_error_rate", while merge/false/synapse-count use
+                # "error_rate".  Accept both so error_level is populated for
+                # every error model (fixes presentation exports labelling
+                # every rate as 0%).
+                pm = r.error_result.perturbation_metadata or {}
+                error_level = float(
+                    pm.get("target_error_rate", pm.get("error_rate", 0.0))
+                )
                 break
             elif r.config_snapshot and "error_model_config" in r.config_snapshot:
                 error_level = float(r.config_snapshot["error_model_config"].get("error_rate", 0.0))

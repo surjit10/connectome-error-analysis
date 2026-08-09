@@ -68,6 +68,35 @@ def build_two_cluster_hub(n_per_cluster: int = 6) -> igraph.Graph:
     return _finalise(g, root_ids)
 
 
+def build_autapse_hub_graph(n_per_cluster: int = 6) -> igraph.Graph:
+    """``build_two_cluster_hub`` plus a self-loop (autapse) on the hub.
+
+    Root 1000 has 2*n_per_cluster partners in two DISJOINT cliques AND an
+    autapse edge 1000 -> 1000.  Regression graph for the MANC autapse crash:
+    the centre must not count itself as a partner, and the autapse must be
+    dropped and counted (``self_loops_dropped``) instead of crashing the
+    exhaustive-partition validation.
+    """
+    n = 1 + 2 * n_per_cluster
+    g = igraph.Graph(directed=True)
+    g.add_vertices(n)
+    root_ids = [1000] + list(range(1, n))
+    g.vs["root_id"] = root_ids
+    edges = [(0, 0)]  # autapse on the hub
+    for p in range(1, n):
+        edges.append((0, p))
+    for a in range(1, 1 + n_per_cluster):
+        for b in range(1, 1 + n_per_cluster):
+            if a < b:
+                edges.append((a, b))
+    for a in range(1 + n_per_cluster, n):
+        for b in range(1 + n_per_cluster, n):
+            if a < b:
+                edges.append((a, b))
+    g.add_edges(edges)
+    return _finalise(g, root_ids)
+
+
 def build_butterfly_hub(k: int = 5) -> igraph.Graph:
     """Hub root 1000 with 2k partners: two cliques of k joined by a bridge.
 
@@ -246,6 +275,59 @@ class TestSplitModel:
         sizes = [len(p) for p in split["fragment_partners"].values()]
         assert sorted(sizes) == [6, 6]
         assert split["edges_rewired"] == 12
+
+    def test_autapse_centre_splits_without_crashing(self) -> None:
+        """MANC regression: a centre with a self-loop must not raise
+        'Partner partition is not exhaustive' (the centre is never its own
+        partner); the autapse is dropped and counted, not rewired."""
+        prepared = preprocess_graph(
+            build_autapse_hub_graph(), index_node_attrs=[]
+        )
+        from modules.error_models import registry
+
+        model = registry.instantiate("split_errors")
+        result = model.execute(
+            prepared,
+            config={"error_rate": 1.0, "degree_threshold": 10,
+                    "min_fragment_partners": 3},
+            seed=42,
+        )
+        assert result.succeeded
+        plan = result.extra["split_plan"]
+        assert set(plan.keys()) == {1000}
+        split = plan[1000]
+        # Exactly the 12 real partners — never the centre itself.
+        fragments = list(split["fragment_partners"].values())
+        union = set(fragments[0]) | set(fragments[1])
+        assert union == set(range(1, 13))
+        assert 1000 not in union
+        assert len(fragments[0]) + len(fragments[1]) == 12
+        # Autapse bookkeeping: dropped once, not rewired.
+        assert split["self_loops_dropped"] == 1
+        assert split["edges_rewired"] == 12
+        assert result.perturbation_metadata["self_loops_dropped"] == 1
+        assert result.perturbation_metadata["edges_rewired"] == 12
+
+    def test_self_loop_only_neuron_rejected_not_crashed(self) -> None:
+        """A neuron whose only edge is its own autapse is rejected (empty
+        split plan -> baseline analyses), never crashes."""
+        g = igraph.Graph(directed=True)
+        g.add_vertices(1)
+        g.vs["root_id"] = [5000]
+        g.add_edges([(0, 0)])
+        _finalise(g, [5000])
+        prepared = preprocess_graph(g, index_node_attrs=[])
+        from modules.error_models import registry
+
+        model = registry.instantiate("split_errors")
+        result = model.execute(
+            prepared,
+            config={"error_rate": 1.0, "degree_threshold": 1,
+                    "min_fragment_partners": 3},
+            seed=42,
+        )
+        assert result.succeeded
+        assert result.extra["split_plan"] == {}
 
     def test_partner_partition_complete_and_disjoint(self, hub_prepared) -> None:
         """Every partner is assigned to exactly one fragment (no loss/dup)."""
@@ -533,6 +615,59 @@ class TestTempGraphConstruction:
         self._temp_graph(hub_prepared, err)
         assert baseline.vcount() == vcount
         assert baseline.ecount() == ecount
+
+    def test_autapse_dropped_in_temp_graph(self) -> None:
+        """The autapse of a split centre is dropped (not rewired): the temp
+        graph has no self-loops, edge/synapse counts drop by exactly the
+        autapse, and all 12 partner edges are rewired to the fragments."""
+        prepared = preprocess_graph(
+            build_autapse_hub_graph(), index_node_attrs=[]
+        )
+        baseline = prepared.graph
+        err = self._build_runner_result(prepared)
+        plan = err.extra["split_plan"]
+        assert set(plan.keys()) == {1000}
+        assert plan[1000]["self_loops_dropped"] == 1
+
+        from core.experiment_runner import ExperimentConfig, ExperimentResult
+        from core.split_experiment_runner import SplitExperimentRunner
+        from modules.graph_analyses.analysis_registry import (
+            registry as a_reg,
+        )
+        from modules.error_models.common.error_registry import (
+            registry as e_reg,
+        )
+
+        runner = SplitExperimentRunner(a_reg, e_reg)
+        config = ExperimentConfig(dataset_name="TEST", dataset_root="x")
+        result = ExperimentResult(experiment_id="t", dataset_name="TEST")
+        temp, temp_prepared = runner._split_build_temp_graph(
+            prepared, err, config, result
+        )
+        assert temp is not None
+        # The autapse is dropped: exactly one fewer edge and synapse.
+        assert temp.ecount() == baseline.ecount() - 1
+        assert sum(temp.es["syn_count"]) == sum(baseline.es["syn_count"]) - 1
+        # No self-loops, no duplicates anywhere in the temp graph.
+        loops = [e.index for e in temp.es if temp.is_loop(e.index)]
+        assert loops == []
+        assert temp.has_multiple() is False
+        # Original centre replaced by two fragments; 12 partner edges remain.
+        temp_roots = set(temp.vs["root_id"])
+        assert 1000 not in temp_roots
+        frag_ids = set(plan[1000]["fragment_ids"])
+        assert frag_ids <= temp_roots
+        partner_edges = [
+            e for e in temp.es
+            if temp.vs[e.source]["root_id"] in frag_ids
+            or temp.vs[e.target]["root_id"] in frag_ids
+        ]
+        assert len(partner_edges) == 12
+        # Ground-truth autapse count recorded, no bookkeeping mismatch.
+        assert err.perturbation_metadata["self_loops_dropped"] == 1
+        assert not any(
+            "Self-loop bookkeeping mismatch" in w for w in result.warnings
+        )
 
     def test_mutual_split_rewiring(self) -> None:
         """Two adjacent split neurons: the A—B edges are chained to the

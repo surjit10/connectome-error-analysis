@@ -399,6 +399,11 @@ class SplitExperimentRunner:
             # renumbering caused by vertex deletion.
             rewire_ops: List[Dict[str, Any]] = []
             vertices_to_delete: List[int] = []
+            total_self_loops_dropped = 0
+            planned_self_loops = sum(
+                plan.get("self_loops_dropped", 0)
+                for plan in split_plan.values()
+            )
 
             for root_id, plan in split_plan.items():
                 base_idx = baseline_id_to_idx.get(root_id)
@@ -429,6 +434,7 @@ class SplitExperimentRunner:
                 # root id — to avoid double counting.  Phase 3 chains the
                 # partner endpoint through the partner's own split plan.
                 incident_edges: List[tuple] = []
+                op_self_loop_ids: set = set()
                 for e_idx in temp.incident(base_idx, mode="all"):
                     e = temp.es[e_idx]
                     if e.source == base_idx:
@@ -437,10 +443,26 @@ class SplitExperimentRunner:
                     else:
                         partner_root = temp.vs[e.source]["root_id"]
                         outgoing = False
+                    if partner_root == root_id:
+                        # Self-loop (autapse): the centre is not a fragment
+                        # partner, so the edge is dropped and counted (mirrors
+                        # EM5's self-loop bookkeeping).  igraph returns a
+                        # self-loop twice from incident(mode="all"), so count
+                        # unique edge ids.
+                        op_self_loop_ids.add(e_idx)
+                        continue
                     if partner_root in split_plan and root_id > partner_root:
                         continue  # owned by the partner's op
                     attrs = {a: e[a] for a in edge_attrs}
                     incident_edges.append((partner_root, attrs, outgoing))
+
+                total_self_loops_dropped += len(op_self_loop_ids)
+                if op_self_loop_ids:
+                    logger.info(
+                        "[SplitExperimentRunner] Neuron %r: %d self-loop "
+                        "edge(s) dropped (autapse).",
+                        root_id, len(op_self_loop_ids),
+                    )
 
                 if not incident_edges:
                     logger.warning(
@@ -470,6 +492,16 @@ class SplitExperimentRunner:
                     "edges": incident_edges,
                 })
                 vertices_to_delete.append(base_idx)
+
+            # ── Self-loop bookkeeping QC (mirrors EM5) ───────────────────
+            if total_self_loops_dropped != planned_self_loops:
+                msg = (
+                    "[SplitExperimentRunner] Self-loop bookkeeping mismatch: "
+                    f"runner dropped {total_self_loops_dropped}, plan "
+                    f"recorded {planned_self_loops}."
+                )
+                logger.warning("%s", msg)
+                result.warnings.append(msg)
 
             # ── Phase 2: delete all original split neurons (one batch) ──
             if vertices_to_delete:
@@ -556,10 +588,19 @@ class SplitExperimentRunner:
 
             logger.info(
                 "[SplitExperimentRunner] Temp split graph built: "
-                "nodes=%d edges=%d (baseline %d/%d).",
+                "nodes=%d edges=%d (baseline %d/%d) | %d self-loops dropped.",
                 temp.vcount(), temp.ecount(),
                 baseline.vcount(), baseline.ecount(),
+                total_self_loops_dropped,
             )
+
+            # Record the ground-truth autapse count (from the temp graph) so
+            # downstream exports can account for the dropped edges.
+            if total_self_loops_dropped:
+                meta = error_result.perturbation_metadata or {}
+                meta["self_loops_dropped"] = total_self_loops_dropped
+                error_result.perturbation_metadata = meta
+
             return temp, temp_prepared
 
         except Exception as exc:  # noqa: BLE001
