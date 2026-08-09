@@ -21,7 +21,7 @@ The complete artifact set (all NEW files except two safe touches):
 
 | # | Artifact | Path | Type |
 |---|----------|------|------|
-| 1 | Scientific methodology | `docs/error model/em5/method plan.md` | ✅ written |
+| 1 | Scientific methodology | `docs/error model/em5/method plan.md` | Yes — written |
 | 2 | Model package | `modules/error_models/merge_errors/__init__.py`, `model.py` | NEW |
 | 3 | Config | `configs/error_models/merge_errors.yaml` | fill empty placeholder |
 | 4 | Dedicated runner | `core/merge_experiment_runner.py` | NEW |
@@ -213,7 +213,7 @@ sampling without replacement with a disjointness constraint + bounded retries
 
 | Step | File | Action | Depends on |
 |------|------|--------|-----------|
-| 0 | `docs/error model/em5/method plan.md` | ✅ done (this repo) | — |
+| 0 | `docs/error model/em5/method plan.md` | Yes — done (this repo) | — |
 | 1 | `modules/error_models/merge_errors/__init__.py` | NEW — docstring + `from .model import MergeErrorsModel` | — |
 | 2 | `modules/error_models/merge_errors/model.py` | NEW — `MergeErrorsModel(BaseErrorModel)`, `NAME = "merge_errors"`, §2.5 algorithm, self-register | 0 |
 | 3 | `configs/error_models/merge_errors.yaml` | fill placeholder (§2.4) | 0 |
@@ -363,7 +363,7 @@ integration report documented — EM5 adds nothing new to the shared path.
 
 ## 7. Open Items for the User
 
-1. **Error-rate semantics** — ✅ **resolved in the method plan v1.1**: `error_rate`
+1. **Error-rate semantics** — Yes — **resolved in the method plan v1.1**: `error_rate`
    is now the fraction of **eligible neurons** participating in a merge
    (`k = round(0.5 × rate × n_eligible)`), per §11. This is dataset-comparable
    (independent of top-K / `jaccard_min`) and mirrors EM4's per-eligible-neuron

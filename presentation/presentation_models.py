@@ -20,6 +20,6 @@ class DashboardData:
     summary_tables: Dict[str, Any]
     integrity_score: float = 0.0
     integrity_verdict: str = ""
-    integrity_emoji: str = ""
+    integrity_marker: str = ""
     biological_status: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     metric_types: Dict[str, str] = field(default_factory=dict)

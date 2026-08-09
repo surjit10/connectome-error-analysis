@@ -1,7 +1,0 @@
-{
-  "dataset_name": "BANC",
-  "error_model": "false_synapses",
-  "error_rate_pct": "0",
-  "n_trials": 5,
-  "runtime_seconds": 0.0
-}

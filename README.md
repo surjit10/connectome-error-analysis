@@ -53,47 +53,60 @@ v1/
 │   ├── metadata_manager.py      # Experiment provenance & metadata recording
 │   ├── export_manager.py        # Artefact serialisation & ZIP packaging
 │   ├── checkpoint_manager.py    # Mid-run checkpointing for long experiments
-│   └── runtime_monitor.py       # CPU / memory usage tracking
+│   ├── runtime_monitor.py       # CPU / memory usage tracking
+│   ├── split_experiment_runner.py  # Runner for topology-changing models (split/merge)
+│   └── merge_experiment_runner.py  # Merge-model pipeline (candidates, rewiring)
 │
 ├── modules/
 │   ├── error_models/            # Pluggable error simulation models
-│   │   ├── base_error_model.py  # Abstract base; handles calibration & RNG seeding
-│   │   ├── missed_synapses.py   # Experiment 1: stochastic edge-removal model
-│   │   ├── calibration.py       # Calibrates removal probabilities to target rate
-│   │   ├── biology.py           # Biological feature weighting utilities
-│   │   ├── vulnerability.py     # Synapse vulnerability scoring
-│   │   └── error_registry.py    # Global registry for error-model plugins
+│   │   ├── common/              # BaseErrorModel, calibration, biology, registry
+│   │   ├── missed_synapses/     # EM1: stochastic synapse / edge removal
+│   │   ├── false_synapses/      # EM2: spurious-edge (false positive) injection
+│   │   ├── synapse_count/       # EM3: synapse-count measurement noise
+│   │   ├── split_errors/        # EM4: over-segmentation (one neuron -> two)
+│   │   └── merge_errors/        # EM5: under-segmentation (two neurons -> one)
 │   │
 │   ├── graph_analyses/          # Pluggable graph analysis modules
-│   │   ├── base_analysis.py     # Abstract analysis interface
-│   │   ├── structural.py        # Basic structure (nodes, edges, density)
+│   │   ├── structural.py        # Basic structure (nodes, edges, density, weights)
+│   │   ├── degree_distribution  # In/out/total degree stats + KS/Wasserstein
+│   │   ├── pagerank.py          # PageRank score correlations & top-k overlap
+│   │   ├── assortativity.py     # Degree assortativity
+│   │   ├── connected_components.py  # WCC / SCC statistics
+│   │   ├── reciprocity.py       # Edge reciprocity
 │   │   ├── centrality.py        # Betweenness / closeness centrality
-│   │   ├── network_statistics.py # Reciprocity, clustering, path lengths
 │   │   ├── biological.py        # Biologically-informed graph metrics
 │   │   └── analysis_registry.py # Global registry for analysis plugins
 │   │
 │   ├── preprocessing/           # Data wrangling & feature engineering
-│   │   ├── pipeline.py          # End-to-end preprocessing orchestrator
-│   │   ├── prepared_graph.py    # Dataclass holding graph + feature tables
-│   │   ├── lookup.py            # Fast neuron-attribute lookup tables
-│   │   ├── validator.py         # Schema & biological-plausibility checks
-│   │   └── metadata.py          # Dataset-level metadata extraction
+│   │   ├── common/              # pipeline, prepared_graph, lookup, validator
+│   │   ├── missed_synapses/     # vulnerability scoring, biological features
+│   │   └── false_synapses/      # candidate generation, similarity ranking
 │   │
-│   └── statistical_evaluation/  # Baseline-vs-perturbed comparison engine
+│   ├── statistical_evaluation/  # Baseline-vs-perturbed comparison engine
+│   │   ├── evaluator.py         # Metric-level means, CIs, effect sizes
+│   │   └── vector_comparison.py # Distribution/vector comparisons (KS, Wasserstein)
+│   │
+│   └── reporting/               # Data loading, trend & sensitivity analysis
 │
 ├── configs/                     # YAML configuration files
 │   ├── defaults.yaml            # Global defaults (tolerances, random seeds …)
 │   ├── datasets/                # Per-dataset schema & path specs
 │   ├── error_models/            # Per-model hyper-parameter defaults
 │   ├── analyses/                # Per-analysis output specifications
-│   └── experiments/             # Named experiment configurations
+│   ├── experiments/             # Named experiment configurations
+│   └── schemas/                 # Dataset / experiment validation schemas
 │
+├── presentation/                # Reporting pipeline (HTML reports, dashboards)
 ├── notebooks/
-│   └── experiments_missed_synapses.ipynb  # Kaggle-ready experiment notebook
+│   ├── error-1-...missed-synapses.ipynb   # EM1 Kaggle notebook
+│   ├── error-2-false-synapse.ipynb        # EM2 Kaggle notebook
+│   ├── error-3-synapse-count.ipynb        # EM3 Kaggle notebook
+│   ├── error-4-split-errors.ipynb         # EM4 Kaggle notebook
+│   └── error-5-merge-errors.ipynb         # EM5 Kaggle notebook
 │
+├── docs/                        # Methodology, architecture, dataset analysis
+│   └── method/                  # Scientific design approach + mermaid diagrams
 ├── tests/                       # pytest test suite
-├── 0-demodata/                  # Synthetic TEST dataset for local smoke tests
-├── run_demo.py                  # Local end-to-end demo script
 └── requirements.txt
 ```
 
@@ -101,15 +114,18 @@ v1/
 
 ## Datasets
 
-The framework supports three FlyWire connectome releases:
+The framework supports five FlyWire connectome releases, configured in `configs/datasets/*.yaml`:
 
-| Name     | Description                                  |
-|----------|----------------------------------------------|
-| `FAFB`   | Full Adult Female Brain (630k neurons)        |
-| `MALE`   | Full Adult Male Brain                         |
-| `TEST`   | Small synthetic dataset for local dev/testing |
+| Name   | Description                                   |
+|--------|-----------------------------------------------|
+| `BANC` | Brain And Nerve Cord connectome                |
+| `FAFB` | Full Adult Female Brain (3-file join schema)   |
+| `MANC` | Male Adult Nerve Cord (very dense graph)       |
+| `MAOL` | Male Adult Optic Lobe                          |
+| `MCNS` | Multi-cell type Nervous System (pre-release)   |
+| `TEST` | Small synthetic dataset (local smoke tests)    |
 
-Dataset paths are resolved via `configs/datasets/*.yaml`. Place raw data under a root directory and point `dataset_root` to it.
+Raw data lives under `research_data/` (git-ignored); dataset paths are resolved via `configs/datasets/*.yaml`. The FAFB schema additionally requires `classification.csv.gz` and `consolidated_cell_types.csv.gz` alongside `neurons.csv.gz` and `connections_princeton.csv.gz`.
 
 ---
 
@@ -121,42 +137,44 @@ Dataset paths are resolved via `configs/datasets/*.yaml`. Place raw data under a
 pip install -r requirements.txt
 ```
 
-### 2. Run the local demo
-
-Runs a baseline (0 % error) and a perturbed (10 % error) experiment on the small
-synthetic TEST dataset, then exports results to `results/`.
+### 2. Run the test suite
 
 ```bash
-python run_demo.py
+pytest tests/ -q
 ```
 
-### 3. Run on Kaggle (full connectomes)
+### 3. Run an experiment on Kaggle (full connectomes)
 
-1. Upload `flywire_codebase.zip` → Kaggle dataset `flywire-codebase`  
-2. Upload `flywire_all_datasets.zip` → Kaggle dataset `flywire-all-datasets`  
-3. Open `notebooks/experiments_missed_synapses.ipynb` in Kaggle  
-4. Set `DATASET_NAME` in Cell 3 (e.g. `"FAFB"`, `"MALE"`)  
+1. Upload `flywire_codebase.zip` -> Kaggle dataset `flywire-codebase`
+2. Upload the raw datasets -> Kaggle dataset `flywire-all-datasets`
+3. Open one of the error-model notebooks in `notebooks/` (e.g. `error-5-merge-errors.ipynb`)
+4. Set `DATASET_NAME` in the setup cell (e.g. `"BANC"`, `"FAFB"`, `"MANC"`)
 5. Click **Run All**
+
+Each notebook runs the full pipeline: preprocessing -> error perturbation -> graph analyses -> statistical evaluation -> HTML report export.
 
 ---
 
-## Experiment 1 — Missed Synapses
+## Error Models
 
-The first experiment models **missed synapses**: edges (synaptic connections) that
-exist in the true connectome but were not detected by the annotation pipeline.
+The framework implements five error models, each simulating a distinct reconstruction error type:
 
-**Error model**: For each edge the calibrated removal probability is computed from
-biological features (synapse count, pre/post-synaptic neuron degree). A binomial
-trial is performed independently for every synapse on the edge; the edge is removed
-if all its synapses are lost.
+| Model            | Notebook              | Simulated error                                  | Graph-level effect                       |
+|------------------|-----------------------|--------------------------------------------------|------------------------------------------|
+| Missed synapses  | `error-1-...ipynb`    | True synapses missed by detection                | Synapse/edge loss (edge removed only when all synapses lost) |
+| False synapses   | `error-2-...ipynb`    | Spurious (false-positive) synapse detection      | New edges injected (candidate-ranked by similarity) |
+| Synapse count    | `error-3-...ipynb`    | Measurement uncertainty in synapse counts        | Edge weights perturbed, topology unchanged |
+| Split errors     | `error-4-...ipynb`    | Over-segmentation (one neuron -> two)            | Vertex count increases, edges conserved    |
+| Merge errors     | `error-5-...ipynb`    | Under-segmentation (two neurons -> one)          | Vertex count decreases, edges rewired      |
 
-**Key analyses run**:
-- Basic structure (node/edge counts, density)
-- Degree distribution
-- PageRank
-- Centrality (betweenness, closeness)
-- Connected components
-- Reciprocity
+All models share the same scientific scaffold: a biologically motivated perturbation, probability calibration to hit the target error rate, seeded stochastic sampling, and multiple trials across an error-rate sweep. See `docs/method/` for the full scientific methodology with diagrams.
+
+**Key analyses run per experiment**:
+- Basic structure (node/edge counts, density, weight statistics)
+- Degree distribution (in/out/total, KS & Wasserstein comparisons)
+- PageRank (Pearson / Spearman correlation, top-k overlap)
+- Assortativity, connected components (WCC/SCC), reciprocity
+- Statistical evaluation: means, 95% CIs, Cohen's d, preservation %
 
 ---
 

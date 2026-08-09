@@ -14,22 +14,22 @@
 
 | Module | File | Responsibility | Reuse | Modify | New |
 |--------|------|----------------|-------|--------|-----|
-| `BaseErrorModel` | `modules/error_models/common/base_error_model.py` | Abstract base: validation, RNG, timing, exception wrapping, `_perturb` dispatch | ✅ Inherit directly | ❌ | — |
-| `ErrorResult` | `modules/error_models/common/error_result.py` | Return contract: `edge_mask`, `added_edges`, `weight_updates`, metadata | ✅ Populate directly | ❌ | — |
-| `ErrorRegistry` | `modules/error_models/common/error_registry.py` | Name-keyed catalogue of models | ✅ `registry.register()` | ❌ | — |
-| `common/utils.py` | `modules/error_models/common/utils.py` | `require_config_key`, `validate_config_keys`, `add_warning` | ✅ Import directly | ❌ | — |
-| `ExperimentRunner` | `core/experiment_runner.py` | Production runner for EM1–EM3 only | ❌ No | ❌ | — |
-| **`SplitExperimentRunner`**| `core/split_experiment_runner.py` | Dedicated execution pipeline for topology-changing error models requiring temporary vertex creation. | — | — | ✅ New |
-| `PreparedGraph` | `modules/preprocessing/common/prepared_graph.py` | Immutable baseline graph container | ✅ Read-only access | ❌ | — |
-| `GraphLookup` | `modules/preprocessing/common/lookup.py` | `id_to_idx` mapping for root ID → igraph vertex index | ✅ Used for `added_edges` root ID resolution | ❌ | — |
-| `AnalysisRegistry` | `modules/graph_analyses/analysis_registry.py` | Catalogue of graph analyses | ✅ Unchanged | ❌ | — |
-| `StatisticsEngine` | `core/statistics_engine.py` | Aggregates `ExperimentResult` lists | ✅ Unchanged | ❌ | — |
-| `ExportManager` | `core/export_manager.py` | CSV/JSON/HTML export | ✅ Unchanged | ❌ | — |
-| `CheckpointManager` | `core/checkpoint_manager.py` | Trial checkpointing | ✅ Unchanged | ❌ | — |
-| **`split_errors/`** | `modules/error_models/split_errors/` | EM4 perturbation model | — | — | ✅ New |
-| **`split_errors.yaml`** | `configs/error_models/split_errors.yaml` | EM4 configuration | — | — | ✅ New |
-| **`error-4-split-errors.ipynb`** | `notebooks/error-4-split-errors.ipynb` | EM4 experiment notebook | — | — | ✅ New |
-| **`test_split_errors.py`** | `tests/test_split_errors.py` | EM4 unit and integration tests | — | — | ✅ New |
+| `BaseErrorModel` | `modules/error_models/common/base_error_model.py` | Abstract base: validation, RNG, timing, exception wrapping, `_perturb` dispatch | Yes — inherit directly | No | — |
+| `ErrorResult` | `modules/error_models/common/error_result.py` | Return contract: `edge_mask`, `added_edges`, `weight_updates`, metadata | Yes — populate directly | No | — |
+| `ErrorRegistry` | `modules/error_models/common/error_registry.py` | Name-keyed catalogue of models | Yes — `registry.register()` | No | — |
+| `common/utils.py` | `modules/error_models/common/utils.py` | `require_config_key`, `validate_config_keys`, `add_warning` | Yes — import directly | No | — |
+| `ExperimentRunner` | `core/experiment_runner.py` | Production runner for EM1–EM3 only | No | No | — |
+| **`SplitExperimentRunner`**| `core/split_experiment_runner.py` | Dedicated execution pipeline for topology-changing error models requiring temporary vertex creation. | — | — | Yes — new |
+| `PreparedGraph` | `modules/preprocessing/common/prepared_graph.py` | Immutable baseline graph container | Yes — read-only access | No | — |
+| `GraphLookup` | `modules/preprocessing/common/lookup.py` | `id_to_idx` mapping for root ID → igraph vertex index | Yes — used for `added_edges` root ID resolution | No | — |
+| `AnalysisRegistry` | `modules/graph_analyses/analysis_registry.py` | Catalogue of graph analyses | Yes — unchanged | No | — |
+| `StatisticsEngine` | `core/statistics_engine.py` | Aggregates `ExperimentResult` lists | Yes — unchanged | No | — |
+| `ExportManager` | `core/export_manager.py` | CSV/JSON/HTML export | Yes — unchanged | No | — |
+| `CheckpointManager` | `core/checkpoint_manager.py` | Trial checkpointing | Yes — unchanged | No | — |
+| **`split_errors/`** | `modules/error_models/split_errors/` | EM4 perturbation model | — | — | Yes — new |
+| **`split_errors.yaml`** | `configs/error_models/split_errors.yaml` | EM4 configuration | — | — | Yes — new |
+| **`error-4-split-errors.ipynb`** | `notebooks/error-4-split-errors.ipynb` | EM4 experiment notebook | — | — | Yes — new |
+| **`test_split_errors.py`** | `tests/test_split_errors.py` | EM4 unit and integration tests | — | — | Yes — new |
 
 ---
 

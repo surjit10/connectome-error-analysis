@@ -8,23 +8,23 @@
 
 | Module | File | Responsibility | EM4 Reuse? | Modify? | New? |
 |--------|------|----------------|-----------|---------|------|
-| `BaseErrorModel` | `modules/error_models/common/base_error_model.py` | Abstract base: validation, RNG init, timing, exception wrapping, `_perturb` dispatch | **Yes — inherit directly** | ❌ No | — |
-| `ErrorResult` | `modules/error_models/common/error_result.py` | Return contract: `edge_mask`, `added_edges`, `weight_updates`, `perturbation_metadata` | **Yes — populate directly** | ❌ No | — |
-| `ErrorRegistry` | `modules/error_models/common/error_registry.py` | Catalogue of models, keyed by NAME | **Yes — `registry.register()`** | ❌ No | — |
-| `common/utils.py` | `modules/error_models/common/utils.py` | Config helpers: `require_config_key`, `validate_config_keys`, `add_warning` | **Yes — import directly** | ❌ No | — |
-| `ExperimentRunner` | `core/experiment_runner.py` | Pipeline orchestration, temp graph construction | **Yes — zero changes required** | ❌ No | — |
-| `_build_temp_graph` | inside `experiment_runner.py` | Applies `edge_mask`, `added_edges`, `weight_updates` to baseline | **Yes — already supports topology changes** | ❌ No | — |
-| `PreparedGraph` | `modules/preprocessing/common/prepared_graph.py` | Immutable baseline graph container | **Yes — read-only access only** | ❌ No | — |
-| `AnalysisRegistry` | `modules/graph_analyses/analysis_registry.py` | Catalogue of analyses | **Yes — unchanged** | ❌ No | — |
-| `StatisticsEngine` | `core/statistics_engine.py` | Aggregation of `ExperimentResult` | **Yes — unchanged** | ❌ No | — |
-| `ExportManager` | `core/export_manager.py` | CSV/JSON/HTML export | **Yes — unchanged** | ❌ No | — |
-| `CheckpointManager` | `core/checkpoint_manager.py` | Trial checkpointing | **Yes — unchanged** | ❌ No | — |
-| `BiologicalAssumptions` | `modules/error_models/common/biology.py` | Declarative biology config | ❌ Not needed (split model has its own candidate logic) | ❌ No | — |
-| `ProbabilityCalibrator` | `modules/error_models/common/calibration.py` | EM1-specific synapse probability calibration | ❌ Not needed | ❌ No | — |
-| `VulnerabilityModel` | `modules/preprocessing/missed_synapses/vulnerability.py` | EM1-specific edge vulnerability scoring | ❌ Not needed | ❌ No | — |
-| **`split_errors/`** | `modules/error_models/split_errors/` | New EM4 perturbation model | — | — | **✅ New** |
-| **`split_errors.yaml`** | `configs/error_models/split_errors.yaml` | EM4 configuration | — | — | **✅ New** |
-| **`error-4-split-errors.ipynb`** | `notebooks/error-4-split-errors.ipynb` | EM4 experiment notebook | — | — | **✅ New** |
+| `BaseErrorModel` | `modules/error_models/common/base_error_model.py` | Abstract base: validation, RNG init, timing, exception wrapping, `_perturb` dispatch | **Yes — inherit directly** | No | — |
+| `ErrorResult` | `modules/error_models/common/error_result.py` | Return contract: `edge_mask`, `added_edges`, `weight_updates`, `perturbation_metadata` | **Yes — populate directly** | No | — |
+| `ErrorRegistry` | `modules/error_models/common/error_registry.py` | Catalogue of models, keyed by NAME | **Yes — `registry.register()`** | No | — |
+| `common/utils.py` | `modules/error_models/common/utils.py` | Config helpers: `require_config_key`, `validate_config_keys`, `add_warning` | **Yes — import directly** | No | — |
+| `ExperimentRunner` | `core/experiment_runner.py` | Pipeline orchestration, temp graph construction | **Yes — zero changes required** | No | — |
+| `_build_temp_graph` | inside `experiment_runner.py` | Applies `edge_mask`, `added_edges`, `weight_updates` to baseline | **Yes — already supports topology changes** | No | — |
+| `PreparedGraph` | `modules/preprocessing/common/prepared_graph.py` | Immutable baseline graph container | **Yes — read-only access only** | No | — |
+| `AnalysisRegistry` | `modules/graph_analyses/analysis_registry.py` | Catalogue of analyses | **Yes — unchanged** | No | — |
+| `StatisticsEngine` | `core/statistics_engine.py` | Aggregation of `ExperimentResult` | **Yes — unchanged** | No | — |
+| `ExportManager` | `core/export_manager.py` | CSV/JSON/HTML export | **Yes — unchanged** | No | — |
+| `CheckpointManager` | `core/checkpoint_manager.py` | Trial checkpointing | **Yes — unchanged** | No | — |
+| `BiologicalAssumptions` | `modules/error_models/common/biology.py` | Declarative biology config | Not needed (split model has its own candidate logic) | No | — |
+| `ProbabilityCalibrator` | `modules/error_models/common/calibration.py` | EM1-specific synapse probability calibration | Not needed | No | — |
+| `VulnerabilityModel` | `modules/preprocessing/missed_synapses/vulnerability.py` | EM1-specific edge vulnerability scoring | Not needed | No | — |
+| **`split_errors/`** | `modules/error_models/split_errors/` | New EM4 perturbation model | — | — | **Yes — new** |
+| **`split_errors.yaml`** | `configs/error_models/split_errors.yaml` | EM4 configuration | — | — | **Yes — new** |
+| **`error-4-split-errors.ipynb`** | `notebooks/error-4-split-errors.ipynb` | EM4 experiment notebook | — | — | **Yes — new** |
 
 ---
 
@@ -77,16 +77,16 @@ EM4 SplitErrors
 
 | Utility | Available? | Location | EM4 Usage |
 |---------|-----------|----------|-----------|
-| Neighbor extraction | ✅ igraph native | `graph.neighbors(v)` | Extract ego network |
-| Degree calculation | ✅ igraph native | `graph.degree()` / `graph.degree(v)` | Candidate selection filter |
-| Edge iteration | ✅ igraph native | `graph.es` | Edge count validation |
-| Node lookup | ✅ `PreparedGraph` | `prepared.lookup.id_to_idx` | Map root IDs to igraph indices |
-| Graph copying | ✅ igraph native | `graph.copy()` | **Not needed** — EM4 produces mask/added_edges, never copies baseline |
-| Subgraph creation | ✅ igraph native | `graph.subgraph(vertices)` | Create ego-network subgraph |
-| Connected components | ✅ igraph native | `sub.connected_components()` | Core partition algorithm |
-| Community detection | ✅ igraph native | `sub.community_multilevel()` | Louvain fallback |
-| Node insertion | ✅ igraph native | `graph.add_vertices()` | **Not needed** — ExperimentRunner handles this via `added_edges` |
-| Node deletion | ✅ igraph native | `graph.delete_vertices()` | **Not needed** — communicated via `edge_mask` |
+| Neighbor extraction | Yes — igraph native | `graph.neighbors(v)` | Extract ego network |
+| Degree calculation | Yes — igraph native | `graph.degree()` / `graph.degree(v)` | Candidate selection filter |
+| Edge iteration | Yes — igraph native | `graph.es` | Edge count validation |
+| Node lookup | Yes — `PreparedGraph` | `prepared.lookup.id_to_idx` | Map root IDs to igraph indices |
+| Graph copying | Yes — igraph native | `graph.copy()` | **Not needed** — EM4 produces mask/added_edges, never copies baseline |
+| Subgraph creation | Yes — igraph native | `graph.subgraph(vertices)` | Create ego-network subgraph |
+| Connected components | Yes — igraph native | `sub.connected_components()` | Core partition algorithm |
+| Community detection | Yes — igraph native | `sub.community_multilevel()` | Louvain fallback |
+| Node insertion | Yes — igraph native | `graph.add_vertices()` | **Not needed** — ExperimentRunner handles this via `added_edges` |
+| Node deletion | Yes — igraph native | `graph.delete_vertices()` | **Not needed** — communicated via `edge_mask` |
 
 **Finding:** No new graph utility functions are required. All necessary operations are already available in igraph or the existing framework.
 
@@ -161,14 +161,14 @@ The statistics pipeline consumes `ExperimentResult`, which is agnostic to the er
 
 | Hook | Status |
 |------|--------|
-| `rng` (seeded, non-global) | ✅ Provided as argument to `_perturb` |
-| `config` dict | ✅ Provided as argument to `_perturb` |
-| `result` pre-initialised | ✅ Provided as argument to `_perturb` |
-| Input validation | ✅ `_validate_input` runs before `_perturb` |
-| Exception handling | ✅ Any uncaught exception in `_perturb` is caught by `execute()` |
-| Timing | ✅ `runtime_seconds` set automatically |
-| Logging | ✅ Start/finish logged automatically |
-| NAME enforcement | ✅ `__init_subclass__` enforces non-empty NAME |
+| `rng` (seeded, non-global) | Yes — Provided as argument to `_perturb` |
+| `config` dict | Yes — Provided as argument to `_perturb` |
+| `result` pre-initialised | Yes — Provided as argument to `_perturb` |
+| Input validation | Yes — `_validate_input` runs before `_perturb` |
+| Exception handling | Yes — Any uncaught exception in `_perturb` is caught by `execute()` |
+| Timing | Yes — `runtime_seconds` set automatically |
+| Logging | Yes — Start/finish logged automatically |
+| NAME enforcement | Yes — `__init_subclass__` enforces non-empty NAME |
 
 > **Verdict: BaseErrorModel requires zero modifications. EM4 inherits it unchanged.**
 
@@ -371,7 +371,7 @@ notebooks/
 
 ## Final Recommendation
 
-### ✅ Option A
+### Yes — Option A
 
 > **EM4 can be implemented entirely as a standalone module. The single required change — appending one import line to `modules/error_models/__init__.py` — is purely additive. No existing architecture changes are required. Proceed with implementation.**
 

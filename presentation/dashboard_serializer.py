@@ -67,11 +67,11 @@ class DashboardSerializer:
                         if key not in metric_types:
                             metric_types[key] = get_metric_type(key)
                         if key not in bio_status and is_preservation_metric(key):
-                            emoji, label, css = get_biological_status(pres)
+                            marker, label, css = get_biological_status(pres)
                             bio_status[key] = {
                                 "preservation": round(pres, 2),
                                 "status": label,
-                                "emoji": emoji,
+                                "marker": marker,
                                 "css": css,
                             }
         
@@ -94,7 +94,7 @@ class DashboardSerializer:
                 if preservations:
                     integrity_score = round(sum(preservations) / len(preservations), 2)
         
-        integrity_emoji, integrity_verdict, _ = get_integrity_verdict(integrity_score)
+        integrity_marker, integrity_verdict, _ = get_integrity_verdict(integrity_score)
                     
         dash = DashboardData(
             metadata=meta,
@@ -106,7 +106,7 @@ class DashboardSerializer:
             summary_tables={},
             integrity_score=integrity_score,
             integrity_verdict=integrity_verdict,
-            integrity_emoji=integrity_emoji,
+            integrity_marker=integrity_marker,
             biological_status=bio_status,
             metric_types=metric_types,
         )

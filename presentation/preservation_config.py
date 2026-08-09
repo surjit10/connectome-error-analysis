@@ -68,12 +68,12 @@ def is_change_metric(key: str) -> bool:
 # Biological Status thresholds  (preservation metrics only)
 # ---------------------------------------------------------------------------
 
-# Each entry: (min_preservation_inclusive, max_preservation_exclusive, label, emoji)
+# Each entry: (min_preservation_inclusive, max_preservation_exclusive, label, marker)
 PRESERVATION_THRESHOLDS: List[Tuple[float, float, str, str]] = [
-    (99.0, 100.01, "Preserved",              "\U0001f7e2"),  # 🟢  99–100%
-    (95.0, 99.0,   "Minor Impact",           "\U0001f7e1"),  # 🟡  95–99%
-    (90.0, 95.0,   "Moderate Impact",        "\U0001f7e0"),  # 🟠  90–95%
-    (0.0,  90.0,   "Significant Disruption", "\U0001f534"),  # 🔴   0–90%
+    (99.0, 100.01, "Preserved",              "preserved"),  # 99-100%
+    (95.0, 99.0,   "Minor Impact",           "minor"),  # 95-99%
+    (90.0, 95.0,   "Moderate Impact",        "moderate"),  # 90-95%
+    (0.0,  90.0,   "Significant Disruption", "severe"),  # 0-90%
 ]
 
 # ---------------------------------------------------------------------------
@@ -141,10 +141,10 @@ def is_invariant_metric(key: str) -> bool:
 # ---------------------------------------------------------------------------
 
 INTEGRITY_THRESHOLDS: List[Tuple[float, float, str, str]] = [
-    (99.0, 100.01, "Biologically Preserved",           "\U0001f7e2"),  # 🟢
-    (95.0, 99.0,   "Minor Biological Impact",           "\U0001f7e1"),  # 🟡
-    (90.0, 95.0,   "Moderate Biological Disruption",    "\U0001f7e0"),  # 🟠
-    (0.0,  90.0,   "Significant Biological Disruption", "\U0001f534"),  # 🔴
+    (99.0, 100.01, "Biologically Preserved",           "preserved"),  # preserved
+    (95.0, 99.0,   "Minor Biological Impact",           "minor"),  # minor
+    (90.0, 95.0,   "Moderate Biological Disruption",    "moderate"),  # moderate
+    (0.0,  90.0,   "Significant Biological Disruption", "severe"),  # severe
 ]
 
 # ---------------------------------------------------------------------------
@@ -269,21 +269,21 @@ def calculate_preservation(
 # -- Status / verdict helpers -----------------------------------------------
 
 def get_biological_status(preservation: float) -> Tuple[str, str, str]:
-    """Return (emoji, label, css_class) for a preservation percentage."""
+    """Return (marker, label, css_class) for a preservation percentage."""
     for lo, hi, label, emoji in PRESERVATION_THRESHOLDS:
         if lo <= preservation < hi:
             css = _label_to_css(label)
             return emoji, label, css
-    return "\U0001f534", "Significant Disruption", "disruption"
+    return "severe", "Significant Disruption", "disruption"
 
 
 def get_integrity_verdict(integrity_score: float) -> Tuple[str, str, str]:
-    """Return (emoji, verdict_text, css_class) for an overall integrity score."""
+    """Return (marker, verdict_text, css_class) for an overall integrity score."""
     for lo, hi, label, emoji in INTEGRITY_THRESHOLDS:
         if lo <= integrity_score < hi:
             css = _label_to_css(label)
             return emoji, label, css
-    return "\U0001f534", "Significant Biological Disruption", "disruption"
+    return "severe", "Significant Biological Disruption", "disruption"
 
 
 # -- Change interpretation --------------------------------------------------
