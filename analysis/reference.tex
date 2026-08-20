@@ -1,0 +1,116 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{hyperref}
+\usepackage{booktabs}
+
+\title{Reference Notes: Detailed Speaking Guide \& Error Model Design}
+\author{Surjit}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{How I Designed the 5 Error Models}
+Use these details to confidently answer questions about how the errors were simulated in the graph. The simulations manipulate the graph directly without relying on 3D morphological data.
+
+\subsection*{1. Missed Synapses (Synapse Deletion)}
+\textbf{Design Logic:} Simulates an automated pipeline failing to detect synapses (false negatives).
+\begin{itemize}
+    \item \textbf{Implementation:} I sample synapses from the baseline graph and delete them until the target error rate (e.g., 20\%) is reached.
+    \item \textbf{How sampling targets errors:} Every single synapse in the entire graph is subject to this error. There is no bias toward specific neurons. I treat the survival of every individual synapse as an independent coin flip (a binomial distribution). For example, if a connection has 5 synapses, I flip a biased coin 5 times using the target removal probability.
+    \item \textbf{Key Insight:} A connection (edge) between two neurons is only completely deleted if \emph{every single synapse} supporting that connection happens to be randomly removed. Strong connections with many synapses almost always survive. This preserves topology while eroding the weighted layer.
+\end{itemize}
+
+\subsection*{2. False Synapses (Hallucinated Connections)}
+\textbf{Design Logic:} Simulates the pipeline wrongly declaring a synapse between two neurons that aren't actually connected (false positives).
+\begin{itemize}
+    \item \textbf{Implementation \& Biological Plausibility:} Instead of randomly connecting any two neurons in the brain, I enforce biological plausibility using "guilt by association." If neuron A connects to neurons X, Y, and Z, and neuron B also connects to X, Y, and Z, it means A and B participate in the exact same local circuit. Because they are biologically close and function together, an automated algorithm is much more likely to mistakenly hallucinate a connection between A and B than between two random, unrelated neurons. I use \textbf{Jaccard similarity} to mathematically score exactly how many targets two neurons share. If they share many targets but don't connect to each other, they become prime candidates for a false synapse.
+    \item \textbf{How sampling targets errors:} The algorithm scores all eligible pairs of neurons using Jaccard similarity, creating a ranked list of "highly likely" hallucinations. It then randomly samples from these top candidates (weighted by their similarity score) to add new edges.
+    \item \textbf{Weight Assignment:} I assign a weight (number of synapses) to this hallucinated connection by sampling from the empirical weight distribution of the original graph.
+\end{itemize}
+
+\subsection*{3. Synapse-Count Measurement Noise}
+\textbf{Design Logic:} Acts as a strict control model. Simulates minor counting errors in the number of synapses for valid connections.
+\begin{itemize}
+    \item \textbf{Implementation:} I apply proportional random noise to the weights (synapse counts) of existing edges.
+    \item \textbf{How sampling targets errors:} This applies universally to all existing connections in the graph. The noise value added or subtracted is sampled randomly but is proportional to the original weight.
+    \item \textbf{Key Insight:} No edges or neurons are added or removed. The graph topology remains identical. If structural metrics move, something is wrong with the pipeline; since they don't, it proves the experiment isolates weighted effects perfectly.
+\end{itemize}
+
+\subsection*{4. Split Errors (Over-segmentation)}
+\textbf{Design Logic:} Simulates the pipeline wrongly cutting a single neuron into multiple fragments.
+\begin{itemize}
+    \item \textbf{How sampling targets errors:} I first find all neurons that are "eligible" to be split (e.g., they must have at least 10 connections, otherwise there's nothing meaningful to split). From this eligible pool, I randomly sample neurons uniformly (without replacement) until I reach the target error rate (e.g., 20\% of eligible neurons).
+    \item \textbf{Implementation:} I use local graph topology as a proxy for physical branches. For the chosen neuron, I extract its 1-hop ego network (its immediate partners). I use connected components (or a Louvain community detection fallback) on the connections \emph{between} those partners to find coherent local circuits.
+    \item \textbf{Edge Reassignment:} The original neuron is deleted, and two new fragment identities are created. I reassign the existing edges exactly once to these new fragments, based on which local circuit their partner belongs to. No synapses are created or destroyed, just distributed across more identities.
+\end{itemize}
+
+\subsection*{5. Merge Errors (Under-segmentation)}
+\textbf{Design Logic:} Simulates the pipeline wrongly joining multiple distinct neurons into a single giant identity.
+\begin{itemize}
+    \item \textbf{How sampling targets errors:} Merge errors target pairs of neurons that are structurally or physically close. The algorithm evaluates candidate pairs based on hard anatomical constraints (like being in the same brain region) and ranks them using Jaccard similarity of their partners. I then randomly sample pairs from this list without replacement, with probabilities weighted by their similarity, until the target error rate is hit.
+    \item \textbf{Implementation:} This is the exact mirror of splitting. I collapse the identities of the chosen pair of neurons into one. Their connections are summed together. 
+    \item \textbf{Key Insight:} Any connection that existed between the two merged neurons becomes a self-loop (which is ignored), leading to an overall loss of edges. The surviving connections combine their weights, causing a massive spike in weight variance and heavily concentrating the graph's connectivity.
+\end{itemize}
+
+\newpage
+\section{What to Actually Speak (Slide-by-Slide Guide)}
+This is the detailed script for each slide based on the core messages in the deck.
+
+\subsection*{Slide 1: Title \& Research Question (25s)}
+\textbf{What to say:} 
+``Good morning. Today I'm sharing a progress update on our FlyWire connectome research. The question we are answering is simple: when we make mistakes while reconstructing a brain's wiring diagram, how much does it change the results of our graph analysis? A connectome is a directed, weighted graph where neurons are nodes and synapses are edges. The automated process that builds it makes mistakes, which change the map. We want to know which mistakes hurt the most and which we can safely ignore.''\\
+\textbf{Key Numbers to mention:} 5 connectomes, 5 error types, error rates up to 20\%.
+
+\subsection*{Slide 2: Experimental Design (30s)}
+\textbf{What to say:} 
+``Here is our setup. We take a real, correct brain map, deliberately add a controlled amount of error, run graph analyses, and compare the results to the original. We do this across 5 different connectomes and 5 different error types at rates up to 20\%. In total, that gives us 1,030 trials and 6,180 analysis rows, with zero failures. Every change we see is caused by the error we added, because we verified the original maps don't change on their own.''\\
+\textbf{Key Numbers to mention:} 1,030 trials, 6,180 analysis rows, 0 failed rows.
+
+\subsection*{Slide 3: What Does Each Error Model Change? (45s)}
+\textbf{What to say:} 
+``This is the one-slide summary. Every number here is the mean change across the datasets at the 20\% error rate. Orange means a property went down, blue means it went up. 
+\begin{itemize}
+    \item Missed synapses: we target 20\% synapse loss, but the edge loss is only 5\%.
+    \item False synapses: more edges are added, so weights become distributed.
+    \item Count noise: only weights move, topology is flat.
+    \item Split errors: degree drops by 15\%, the graph fragments.
+    \item Merge errors: edges drop, weight variance spikes by 47\% as identities collapse.
+\end{itemize}
+The main takeaway: different errors leave distinct graph fingerprints. I'll walk you through each now.''
+
+\subsection*{Slide 4: Missed Synapses (35s)}
+\textbf{What to say:} 
+``First: missed synapses. At 20\% error, we remove exactly 20\% of all synapses. But the mean edge loss is only about 5\%. Why? Because removing individual synapses doesn't eliminate a neuron-to-neuron connection unless every single synapse on it is removed. Most connections stay intact. The fingerprint: the weighted layer erodes (weight variance drops 30\%), but most structure and importance ranking barely move. PageRank correlation stays at 0.999.''
+
+\subsection*{Slide 5: False Synapses (30s)}
+\textbf{What to say:} 
+``Next: false synapses (hallucinated connections). Here the graph gets inflated. The mean edge count increases by about 19\%. The fake connections land inside the big connected core, expanding it slightly. Because the same amount of total connection strength is spread over more edges, the weights get diluted, and weight variance drops by about 14\%. PageRank remains very stable at 0.994.''
+
+\subsection*{Slide 6: Measurement Noise (25s)}
+\textbf{What to say:} 
+``Third is measurement noise. This is our control experiment: it only touches the weights. And exactly as expected, edge count, degree, and components stay at 0.0\% change. Only the weight variance moves, by about 5.5\%. The scientific point is that if our synapse counts are slightly off, we can still trust the overall structure of the graph.''
+
+\subsection*{Slide 7: Split Errors (35s)}
+\textbf{What to say:} 
+``Fourth: split errors, where one neuron is wrongly cut into pieces. The edge budget is preserved, but those edges are redistributed across more neuron identities. The result: the mean degree drops by about 15\%, because each piece of a neuron has fewer connections than the whole neuron had. The graph fragments, and the largest components (WCC/SCC) grow by about 18\% relative to the graph structure as it breaks into smaller islands. Edge and synapse counts stay flat. PageRank holds at 0.995.''
+
+\subsection*{Slide 8: Merge Errors (30s)}
+\textbf{What to say:} 
+``Fifth: merge errors, where neurons wrongly join together. In our simulations, this produced the strongest structural disruption. When neurons collapse together, connections disappear (becoming self-loops), so edge loss is about 11\%. The graph condenses, and components shrink by 9\%. Because total connection strength is squeezed into fewer, heavier connections, weight variance jumps by 47\%---the biggest change in the study. PageRank is at 0.989; still high, but the lowest of the five.''
+
+\subsection*{Slide 9: PageRank Robustness (40s)}
+\textbf{What to say:} 
+``How robust is the importance ranking? The two graphs show the best (missed synapses) and worst (merge errors) cases. Even in the worst case, global PageRank similarity stays at or above 0.977 on every dataset. The global ranking is incredibly stable. One caveat: the exact list of top-100 hubs is more fragile. Under merge errors, it drops to 0.92 overlap (and 0.86 on BANC). So while the overall order survives, a few top hubs get displaced.''
+
+\subsection*{Slide 10: What the Results Mean (30s)}
+\textbf{What to say:} 
+``What do these results mean? Three conclusions. First, each error leaves a distinct fingerprint. Second, split and merge are mirror images: split spreads the graph out and fragments it, merge collapses and concentrates it. Third, robustness depends on the metric. An error can distort the physical structure of the graph without destroying the global PageRank ranking of which neurons matter most.''
+
+\subsection*{Slide 11: Conclusions (40s)}
+\textbf{What to say:} 
+``To conclude: The graph has two layers. The connectivity layer responds to missed and false synapses. The neuron-identity layer responds to split and merge errors. Weighted statistics are the early warning system, reacting most sensitively. Component structure (like SCC) is the best structural indicator because it catches fragmentation that edge counts miss. Because the 5 connectomes behave consistently, our benchmarking effort is best spent on missed-synapse detection, which has a disproportionate impact on the synaptic layer.''
+
+\end{document}

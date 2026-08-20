@@ -75,21 +75,28 @@ def wrap_lines(text, fontsize, width_in, fig=None, weight="normal", style="norma
     """
     if not text:
         return [""]
-    words = text.split()
-    lines, cur = [], []
-    if fig is not None:
-        limit = width_in * 0.985
-        for w in words:
-            trial = " ".join(cur + [w]) if cur else w
-            if cur and text_width_in(fig, trial, fontsize, weight, style) > limit:
-                lines.append(" ".join(cur)); cur = [w]
-            else:
-                cur.append(w)
-        if cur:
-            lines.append(" ".join(cur))
-        return lines or [""]
-    cpl = max(8, int(width_in / (fontsize * 0.62 / 72.0)))   # conservative fallback
-    return textwrap.wrap(text, cpl) or [""]
+    # explicit newlines are preserved so stacked cells (e.g. WCC over SCC)
+    # render on separate lines; each segment is wrapped independently so no
+    # segment overflows its box
+    out = []
+    for seg in str(text).split("\n"):
+        words = seg.split()
+        lines, cur = [], []
+        if fig is not None:
+            limit = width_in * 0.985
+            for w in words:
+                trial = " ".join(cur + [w]) if cur else w
+                if cur and text_width_in(fig, trial, fontsize, weight, style) > limit:
+                    lines.append(" ".join(cur)); cur = [w]
+                else:
+                    cur.append(w)
+            if cur:
+                lines.append(" ".join(cur))
+            out.extend(lines)
+        else:
+            cpl = max(8, int(width_in / (fontsize * 0.62 / 72.0)))
+            out.extend(textwrap.wrap(seg, cpl) or [""])
+    return out or [""]
 
 
 def lines_needed(text, fontsize, width_in, fig=None):
@@ -281,8 +288,9 @@ def main():
         r = bval("reciprocity", "metric_reciprocity")
         a = bval("assortativity", "metric_degree_assortativity")
         w = bval("connected_components", "metric_wcc_max_size")
+        sc = bval("connected_components", "metric_scc_count")
         base_rows.append([ds, f"{int(n):,}", f"{int(e):,}", f"{int(t):,}", f"{d:.5f}",
-                          f"{r:.3f}", f"{a:+.3f}", f"{int(w):,}"])
+                          f"{r:.3f}", f"{a:+.3f}", f"{int(w):,}", f"{int(sc):,}"])
 
     # ---------- Table 2: coverage ----------
     ntr = data.groupby(["dataset", "error_model"]).trial.nunique()
@@ -291,14 +299,14 @@ def main():
         cells = []
         for em in EM_ORDER:
             v = ntr.get((ds, em), 0)
-            cells.append(f"{v}x5" if v == 5 else ("—" if v == 0 else f"{v}"))
+            cells.append("—" if v == 0 else str(v))
         cov_rows.append([ds] + cells)
 
     # ---------- Table 3: error models ----------
     method_rows = [
         ["Missed synapses", "Removes synapses per edge with calibrated probability; an edge is deleted only when its weight reaches 0.",
          "Edges ↓, weights ↓, degree ↓"],
-        ["False synapses", "Adds k = round(rate × edges) new edges sampled from region-restricted, Jaccard-ranked candidate pairs; weights from the weak-edge distribution.",
+        ["False synapses", "Adds k = round(rate × edges) new edges sampled from region-restricted, Jaccard-ranked candidate pairs, capped by candidate availability; weights from the weak-edge distribution.",
          "Edges ↑, density ↑"],
         ["Synapse count measurement", "Adds Gaussian noise to edge weights, σ = rate·w, clamped ≥ 1; topology untouched.",
          "Weights only; structure unchanged"],
@@ -310,33 +318,33 @@ def main():
 
     # ---------- Table 4: verification ----------
     checks = [
-        ["Completeness", "6/6 analyses present and SUCCESS in every trial",
-         "Pass — 6,180 analysis rows, 0 failures"],
-        ["Baseline invariance", "0% runs identical across trials and error models",
-         "Pass — max rel. diff 0.0 (bit-identical)"],
+        ["Completeness", "All six analyses present and successful in every trial",
+         "6,180 analysis rows; 0 failures"],
+        ["Baseline invariance", "0 % runs identical across trials and error models",
+         "max relative difference 0.0 (bitwise identical)"],
         ["Degree identity", "sum(in-degrees) = edge count; in-degree mean = edges/nodes",
-         "Pass — max rel. err 2.2e-16"],
+         "max relative error 2.2e-16"],
         ["Density identity", "density = edges / (n·(n−1))",
-         "Pass — max rel. err 7.0e-13"],
-        ["Missed synapses", "synapses removed ≈ rate · synapses (QC enforced)",
-         "Pass — removal matches target"],
-        ["False synapses", "edge additions match planned k = round(rate · edges)",
-         "Pass — at every rate, all trials"],
-        ["Syn. count noise", "weight-variance increase ≈ rate²·E[w²] (theory)",
-         "Pass — predicted 4.98 vs observed ≈5.1 at 20%"],
+         "max relative error 7.0e-13"],
+        ["Missed synapses", "removed synapses ≈ rate · synapses (QC enforced)",
+         "removed count matches target"],
+        ["False synapses", "edge additions = min(planned k = round(rate · edges), candidates available)",
+         "exact for BANC/FAFB at all rates; MCNS caps at the candidate-pool size (18.2 % instead of 20 % at the top rate)"],
+        ["Syn. count noise", "weight-variance increase ≈ rate²·E[w²] (theoretical prediction)",
+         "predicted 5.40 vs observed 5.45 (means across datasets)"],
         ["Split/merge", "edge count preserved (split) / collapse bookkeeping (merge)",
-         "Pass — matches plan metadata"],
+         "matches plan metadata"],
         ["PageRank alignment", "split/merge vectors re-aligned to baseline node space",
-         "Pass — correlations in [0.5, 1] at all rates"],
+         "correlations in [0.5, 1] at all rates"],
     ]
 
     # ---------- Table 5: effect sizes at 20% ----------
     headline = [
-        ("basic_structure", "metric_edge_count", "Edge count"),
-        ("basic_structure", "metric_total_synapses", "Total synapses"),
-        ("basic_structure", "metric_weight_variance", "Weight variance"),
-        ("degree_distribution", "metric_total_degree_mean", "Mean total degree"),
-        ("connected_components", "metric_wcc_max_size", "Largest weak comp."),
+        ("basic_structure", "metric_edge_count", "Edges"),
+        ("basic_structure", "metric_total_synapses", "Synapses"),
+        ("basic_structure", "metric_weight_variance", "Weight var."),
+        ("degree_distribution", "metric_total_degree_mean", "Mean degree"),
+        ("connected_components", "metric_wcc_max_size", "WCC"),
         ("reciprocity", "metric_reciprocity", "Reciprocity"),
         ("assortativity", "metric_degree_assortativity", "Assortativity*"),
     ]
@@ -348,11 +356,21 @@ def main():
         for an, col, lab in headline:
             s = rel[(rel.error_model == em) & (rel.analysis == an) & (rel.metric == col)
                     & (rel.rate == max_rate)]
-            if len(s):
+            if not len(s):
+                row.append("—")
+                continue
+            if col == "metric_wcc_max_size":
+                # stack the two component measures in one column (WCC above SCC)
+                ss = rel[(rel.error_model == em) & (rel.analysis == "connected_components")
+                         & (rel.metric == "metric_scc_max_size") & (rel.rate == max_rate)]
+                scc = f"{ss.rel_change_pct.mean():+.1f}%" if len(ss) else "—"
+                row.append(f"WCC {s.rel_change_pct.mean():+.1f}%\nSCC {scc}")
+                spread.append(("WCC", s.rel_change_pct.min(), s.rel_change_pct.max()))
+                if len(ss):
+                    spread.append(("SCC", ss.rel_change_pct.min(), ss.rel_change_pct.max()))
+            else:
                 row.append(f"{s.rel_change_pct.mean():+.1f}%")
                 spread.append((lab, s.rel_change_pct.min(), s.rel_change_pct.max()))
-            else:
-                row.append("—")
         s = pr[(pr.error_model == em) & (pr.rate == max_rate)]
         row.append(f"{s.pr_pearson.mean():.3f}" if len(s) else "—")
         eff_rows.append(row)
@@ -392,7 +410,7 @@ def main():
                  fontsize=13, ha="center", color="#9fb3dd")
         fig.text(0.5, 0.36, "5 error models × 10 error rates × up to 5 replicate trials  →  1,030 trials",
                  fontsize=12, ha="center", color="#9fb3dd")
-        fig.text(0.5, 0.28, "Framework v1.0.0 · every number recomputed from the per-trial CSVs",
+        fig.text(0.5, 0.28, "Every number recomputed from the per-trial CSVs",
                  fontsize=11, ha="center", color="#7485b0")
         fig.text(0.5, 0.10, datetime.date.today().strftime("%d %B %Y"), fontsize=12,
                  ha="center", color="#cfd8ea")
@@ -473,9 +491,9 @@ def main():
             "rates, with five independent seeded trials per rate, and every trial "
             "ran six graph analyses.", 11)
         y -= 0.016
-        y = draw_table(fig, ML, y, [0.10, 0.12, 0.13, 0.15, 0.10, 0.11, 0.13, 0.13],
+        y = draw_table(fig, ML, y, [0.10, 0.11, 0.12, 0.14, 0.09, 0.10, 0.11, 0.11, 0.12],
                        ["Dataset", "Neurons", "Edges", "Total synapses", "Density",
-                        "Reciprocity", "Assortativity", "Largest WCC"],
+                        "Reciprocity", "Assortativity", "Largest WCC", "SCC count"],
                        base_rows, fontsize=9,
                        title="Table 1 · Baseline network properties at 0 % error (identical across all error models and trials)")
         pdf.savefig(fig)
@@ -488,7 +506,7 @@ def main():
         y = draw_table(fig, ML, y, [0.11, 0.18, 0.18, 0.18, 0.16, 0.16],
                        ["Dataset", "Missed syn.", "False syn.", "Syn. count", "Split", "Merge"],
                        cov_rows, fontsize=9,
-                       title="Table 2 · Replicate trials available per error model (×5 trials per rate; — = not run)")
+                       title="Table 2 · Replicate trials per rate per error model (— = not run)")
         y -= 0.014
         y = draw_wrapped(fig, ML, y,
             "Three error-model runs are missing or partial: MANC and MAOL have no "
@@ -588,7 +606,7 @@ def main():
             "PageRank: Plotted as Pearson correlation (r) rather than % change. Pearson measures vector correlation, not rank preservation; Spearman correlation and top-100 overlap are reported in §5.5b.",
             "Split/Merge: PageRank vectors are re-aligned to baseline node space before correlating.",
             "Partial Runs: Cross-dataset means for merge errors include FAFB (2 trials) and MANC (1 trial).",
-            "Uncertainty: trial-to-trial SD of the reported % changes is below 0.15 pp for every 5-trial cell; the MANC merge row (n = 1) has no trial variance.",
+            "Uncertainty: trial-to-trial SD of the reported % changes stays below 0.18 pp in every 5-trial cell for the structural headline metrics (edge count, total synapses, mean degree, largest WCC/SCC, reciprocity); weight variance reaches 1.3 pp and assortativity 14.9 pp (near-zero baseline inflates relative spread). The MANC merge row (n = 1) has no trial variance.",
         ])
         pdf.savefig(fig)
         plt.close(fig)
@@ -605,8 +623,9 @@ def main():
         y = draw_wrapped(fig, ML, y,
             "The two structural identities (in-degree mean = edges/nodes and density = "
             "edges/(n·(n−1))) hold to machine precision, and the 0 % baseline is "
-            "bit-identical across trials and error models — so all observed changes "
-            "below are caused by the perturbation, never by run-to-run variability.", 10.5)
+            "bitwise identical across trials and error models. All checks passed; "
+            "the changes reported in §5 therefore reflect the perturbations "
+            "themselves, not run-to-run variability.", 10.5)
         pdf.savefig(fig)
         plt.close(fig)
 
@@ -669,12 +688,13 @@ def main():
         import glob as _glob
         HEADLINE_LABELS = [
             "Edge count", "Total synapses", "Mean total degree",
-            "Largest weak component", "Reciprocity",
+            "Largest weak component", "Largest strong component",
+            "Reciprocity",
         ]
         fig_idx = 1
         for em in ems:
             em_label = EM_LABELS[em]
-            # 5 metric figures per error model
+            # 6 metric figures per error model
             for mi, metric_label in enumerate(HEADLINE_LABELS):
                 # Look for the file with pattern EM_{em}_{mi:02d}_*.png
                 pattern = os.path.join(FIG, f"EM_{em}_{mi:02d}_*.png")
@@ -720,39 +740,43 @@ def main():
                        "Mean % change vs baseline across all datasets for each error model")
         y = 0.87
         header = ["Error model", "Edge count", "Total synapses", "Weight variance",
-                  "Mean degree", "Largest WCC", "Reciprocity", "Assortativity*", "PageRank r"]
-        widths = [0.20, 0.09, 0.11, 0.12, 0.09, 0.11, 0.09, 0.11, 0.09]
+                  "Mean degree", "Largest component\n(WCC / SCC)", "Reciprocity",
+                  "Assortativity*", "PageRank r"]
+        widths = [0.17, 0.08, 0.10, 0.10, 0.08, 0.19, 0.08, 0.10, 0.09]
         y = draw_table(fig, ML, y, widths, header, eff_rows, fontsize=8.6,
                        title="Table 5 · % change at the maximum tested error rate (20 %)")
         y -= 0.012
         y = draw_wrapped(fig, ML, y,
-            "*Assortativity has a near-zero baseline (−0.03 to −0.06), so its % change is "
+            "*Assortativity has a near-zero baseline (−0.057 to +0.037; MANC is slightly positive), so its % change is "
             "inflated and should be read as an absolute movement, not a percentage.  "
-            "PageRank r is the mean Pearson correlation across datasets (baseline = 1.0 "
-            "by construction); Spearman and top-100 overlap are reported in §5.5b.", 9.5, color="#222222")
-        y -= 0.016
+            "PageRank r is the mean Pearson correlation (baseline = 1.0 by construction); "
+            "Spearman and top-100 overlap are reported in §5.5b.  †Mean degree "
+            "equals 2·edges/nodes, so its % change coincides exactly with edge count "
+            "whenever the node set is unchanged; the two columns diverge only for "
+            "split/merge errors, which add or remove neurons.", 9.5, color="#222222")
+        y -= 0.012
         fig.text(ML, y, "Spread across datasets (min … max)", va="top",
                  fontsize=12, weight="bold", color=NAVY)
-        y -= 0.028
+        y -= 0.018
         for em in ems:
             if not eff_spread[em]:
                 continue
-            parts = [f"{lab} {lo:+.1f}…{hi:+.1f}%" for lab, lo, hi in eff_spread[em]]
+            parts = [f"{lab} {lo:+.1f}…{hi:+.1f}%"
+                     for lab, lo, hi in eff_spread[em]]
             y = draw_wrapped(fig, ML, y, f"{EM_LABELS[em]}:  " + ";  ".join(parts),
                              fontsize=9, color="#333")
-            y -= 0.012
-        y -= 0.006
+            y -= 0.006
+        y -= 0.008
         y = draw_wrapped(fig, ML, y,
-            "Missed synapses remove exactly 20 % of synapses at the 20 % rate, cutting "
-            "weight variance by 30 % but only deleting the ~5 % of edges whose weight "
-            "reached zero — and PageRank vectors stay highly correlated (Pearson 0.999, "
-            "Spearman 0.998, top-100 overlap 0.98 for missed synapses at 20 %), so most "
-            "high-centrality neurons keep their rank.  False synapses add ~19 % more "
-            "edges, but the new low-weight edges dilute weight variance by ~14 %.  "
-            "Synapse-count noise moves only the weight variance (+5.5 %).  Split errors "
-            "preserve edges but spread them over more neurons (mean degree −15 %, largest "
-            "weak component +18 %).  Merge errors are the most invasive: weight variance "
-            "+47 %, edges −11 %, largest component −9 %.", 10.5)
+            "Missed synapses remove exactly 20 % of synapses, cutting weight variance by "
+            "30 % while deleting only the ~5 % of zero-weight edges; PageRank vectors "
+            "stay highly correlated (Table 5b), so hub rankings largely survive.  False "
+            "synapses add ~19 % more edges, diluting weight variance by ~14 %.  "
+            "Synapse-count noise moves only weight variance (+5.5 %).  Split errors "
+            "preserve edges but spread them over more neurons.  Merge errors are the most "
+            "invasive (weight variance +47 %, edges −11 %).  The SCC tracks the weak "
+            "component except for false synapses, where new edges grow the strong core "
+            "(+0.6 %).", 9.5)
         pdf.savefig(fig)
         plt.close(fig)
 
@@ -872,7 +896,9 @@ def main():
             "FAFB and MANC merge-error results rest on 2 and 1 trials per rate (partial "
             "runs in the source archives); MANC and MAOL have no false-synapse run.  "
             "All other cells use 5 replicate trials, and trial-to-trial SD of the "
-            "reported % changes is below 0.15 pp for every 5-trial cell.  The %-change "
+            "reported % changes stays below 0.18 pp in every 5-trial cell for the "
+            "structural headline metrics (weight variance reaches 1.3 pp and "
+            "assortativity 14.9 pp).  The %-change "
             "framing inflates metrics with near-zero baselines (assortativity) — always "
             "check the raw direction and magnitude.  The five error models are "
             "computational simulations: their error distributions are not empirically "
@@ -939,7 +965,7 @@ def main():
         y = 0.87
         y = bullets(fig, ML, y, [
             "Near-zero-baseline % change.  Relative change is undefined in spirit when the "
-            "baseline is near zero.  Assortativity (baseline −0.03…−0.06) shows % swings of "
+            "baseline is near zero.  Assortativity (baseline −0.057 to +0.037; MANC is slightly positive) shows % swings of "
             "+135 % for a small absolute movement; we report the raw sign and magnitude and "
             "exclude the metric from the heatmap.",
             "Reciprocity baselines (0.13–0.29) are safe for % change; the biggest move is "

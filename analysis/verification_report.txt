@@ -1,0 +1,73 @@
+==============================================================================
+FLYWIRE RESULTS - DATA CONSISTENCY VERIFICATION
+==============================================================================
+
+[1] COMPLETENESS
+  trials per cell: min=1, max=5, cells=220
+  PARTIAL FAFB/merge_errors rate=0.0: only 2 trials
+  PARTIAL FAFB/merge_errors rate=0.5: only 2 trials
+  PARTIAL FAFB/merge_errors rate=1.0: only 2 trials
+  PARTIAL FAFB/merge_errors rate=2.0: only 2 trials
+  PARTIAL FAFB/merge_errors rate=3.0: only 2 trials
+  PARTIAL FAFB/merge_errors rate=5.0: only 2 trials
+  PARTIAL FAFB/merge_errors rate=7.5: only 2 trials
+  PARTIAL FAFB/merge_errors rate=10.0: only 2 trials
+  PARTIAL FAFB/merge_errors rate=15.0: only 2 trials
+  PARTIAL FAFB/merge_errors rate=20.0: only 2 trials
+  PARTIAL MANC/merge_errors rate=0.0: only 1 trials
+  PARTIAL MANC/merge_errors rate=0.5: only 1 trials
+  PARTIAL MANC/merge_errors rate=1.0: only 1 trials
+  PARTIAL MANC/merge_errors rate=2.0: only 1 trials
+  PARTIAL MANC/merge_errors rate=3.0: only 1 trials
+  PARTIAL MANC/merge_errors rate=5.0: only 1 trials
+  PARTIAL MANC/merge_errors rate=7.5: only 1 trials
+  PARTIAL MANC/merge_errors rate=10.0: only 1 trials
+  PARTIAL MANC/merge_errors rate=15.0: only 1 trials
+  PARTIAL MANC/merge_errors rate=20.0: only 1 trials
+  analyses per trial: min=6, max=6 (expect 6)
+  non-SUCCESS rows: 0
+
+[2] BASELINE INVARIANCE (0% error)
+  BANC: baseline max rel diff across error models = 0.00e+00
+    BANC/false_synapses: max std of baseline metrics across 5 trials = 0
+    BANC/merge_errors: max std of baseline metrics across 5 trials = 0
+    BANC/missed_synapses: max std of baseline metrics across 5 trials = 0
+    BANC/split_errors: max std of baseline metrics across 5 trials = 0
+    BANC/synapse_count_measurement: max std of baseline metrics across 5 trials = 0
+  FAFB: baseline max rel diff across error models = 0.00e+00
+    FAFB/false_synapses: max std of baseline metrics across 5 trials = 0
+    FAFB/merge_errors: max std of baseline metrics across 5 trials = 0
+    FAFB/missed_synapses: max std of baseline metrics across 5 trials = 0
+    FAFB/split_errors: max std of baseline metrics across 5 trials = 0
+    FAFB/synapse_count_measurement: max std of baseline metrics across 5 trials = 0
+  MANC: baseline max rel diff across error models = 0.00e+00
+    MANC/merge_errors: max std of baseline metrics across 5 trials = nan
+    MANC/missed_synapses: max std of baseline metrics across 5 trials = 0
+    MANC/split_errors: max std of baseline metrics across 5 trials = 0
+    MANC/synapse_count_measurement: max std of baseline metrics across 5 trials = 0
+  MCNS: baseline max rel diff across error models = 0.00e+00
+    MCNS/false_synapses: max std of baseline metrics across 5 trials = 0
+    MCNS/merge_errors: max std of baseline metrics across 5 trials = 0
+    MCNS/missed_synapses: max std of baseline metrics across 5 trials = 0
+    MCNS/split_errors: max std of baseline metrics across 5 trials = 0
+    MCNS/synapse_count_measurement: max std of baseline metrics across 5 trials = 0
+  MAOL: baseline max rel diff across error models = 0.00e+00
+    MAOL/missed_synapses: max std of baseline metrics across 5 trials = 0
+    MAOL/split_errors: max std of baseline metrics across 5 trials = 0
+    MAOL/synapse_count_measurement: max std of baseline metrics across 5 trials = 0
+
+[3] INTERNAL CONSISTENCY
+  in-degree mean vs edges/nodes: max rel err = 2.206e-16
+  density vs edges/(n*(n-1)):    max rel err = 6.978e-13
+
+[4] SENSITIVITY (metrics that never respond to error rate)
+  FLAT (0% -> max%): BANC/false_synapses connected_components.metric_wcc_max_size; BANC/synapse_count_measurement basic_structure.metric_edge_count; BANC/synapse_count_measurement basic_structure.metric_density; BANC/synapse_count_measurement degree_distribution.metric_total_degree_mean; BANC/synapse_count_measurement assortativity.metric_degree_assortativity; BANC/synapse_count_measurement connected_components.metric_wcc_max_size; BANC/synapse_count_measurement connected_components.metric_scc_max_size; BANC/synapse_count_measurement reciprocity.metric_reciprocity; BANC/split_errors basic_structure.metric_edge_count; BANC/split_errors reciprocity.metric_reciprocity; FAFB/false_synapses connected_components.metric_wcc_max_size; FAFB/synapse_count_measurement basic_structure.metric_edge_count; FAFB/synapse_count_measurement basic_structure.metric_density; FAFB/synapse_count_measurement degree_distribution.metric_total_degree_mean; FAFB/synapse_count_measurement assortativity.metric_degree_assortativity; FAFB/synapse_count_measurement connected_components.metric_wcc_max_size; FAFB/synapse_count_measurement connected_components.metric_scc_max_size; FAFB/synapse_count_measurement reciprocity.metric_reciprocity; FAFB/split_errors basic_structure.metric_edge_count; FAFB/split_errors reciprocity.metric_reciprocity; MANC/synapse_count_measurement basic_structure.metric_edge_count; MANC/synapse_count_measurement basic_structure.metric_density; MANC/synapse_count_measurement degree_distribution.metric_total_degree_mean; MANC/synapse_count_measurement assortativity.metric_degree_assortativity; MANC/synapse_count_measurement connected_components.metric_wcc_max_size; MANC/synapse_count_measurement connected_components.metric_scc_max_size; MANC/synapse_count_measurement reciprocity.metric_reciprocity; MANC/split_errors reciprocity.metric_reciprocity; MCNS/missed_synapses connected_components.metric_wcc_max_size; MCNS/false_synapses connected_components.metric_wcc_max_size; MCNS/synapse_count_measurement basic_structure.metric_edge_count; MCNS/synapse_count_measurement basic_structure.metric_density; MCNS/synapse_count_measurement degree_distribution.metric_total_degree_mean; MCNS/synapse_count_measurement assortativity.metric_degree_assortativity; MCNS/synapse_count_measurement connected_components.metric_wcc_max_size; MCNS/synapse_count_measurement connected_components.metric_scc_max_size; MCNS/synapse_count_measurement reciprocity.metric_reciprocity; MCNS/split_errors reciprocity.metric_reciprocity; MAOL/synapse_count_measurement basic_structure.metric_edge_count; MAOL/synapse_count_measurement basic_structure.metric_density; MAOL/synapse_count_measurement degree_distribution.metric_total_degree_mean; MAOL/synapse_count_measurement assortativity.metric_degree_assortativity; MAOL/synapse_count_measurement connected_components.metric_wcc_max_size; MAOL/synapse_count_measurement connected_components.metric_scc_max_size; MAOL/synapse_count_measurement reciprocity.metric_reciprocity; MAOL/split_errors reciprocity.metric_reciprocity
+
+[5] BASELINE TABLE (rate=0)
+            nodes      edges  total_synapses   density  reciprocity  assortativity   wcc_max   scc_max
+dataset                                                                                               
+BANC     158262.0  3990039.0      23556214.0  0.000159     0.129939      -0.046430  153952.0  139405.0
+FAFB     139255.0  5342446.0      50666648.0  0.000276     0.164738      -0.035843  136997.0  127536.0
+MANC      23665.0  6239883.0      30934610.0  0.011142     0.285270       0.036942   23641.0   23569.0
+MAOL      52445.0  6736968.0      26492194.0  0.002449     0.277633      -0.053530   51503.0   50709.0
+MCNS     166694.0  6239112.0      89797169.0  0.000225     0.156729      -0.056888  165820.0  157789.0

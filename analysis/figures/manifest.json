@@ -1,0 +1,173 @@
+{
+  "em_metric_files": {
+    "false_synapses": [
+      [
+        0,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_false_synapses_00_metric_edge_count.png"
+      ],
+      [
+        1,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_false_synapses_01_metric_total_synapses.png"
+      ],
+      [
+        2,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_false_synapses_02_metric_total_degree_mean.png"
+      ],
+      [
+        3,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_false_synapses_03_metric_wcc_max_size.png"
+      ],
+      [
+        4,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_false_synapses_04_metric_scc_max_size.png"
+      ],
+      [
+        5,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_false_synapses_05_metric_reciprocity.png"
+      ]
+    ],
+    "merge_errors": [
+      [
+        0,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_merge_errors_00_metric_edge_count.png"
+      ],
+      [
+        1,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_merge_errors_01_metric_total_synapses.png"
+      ],
+      [
+        2,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_merge_errors_02_metric_total_degree_mean.png"
+      ],
+      [
+        3,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_merge_errors_03_metric_wcc_max_size.png"
+      ],
+      [
+        4,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_merge_errors_04_metric_scc_max_size.png"
+      ],
+      [
+        5,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_merge_errors_05_metric_reciprocity.png"
+      ]
+    ],
+    "missed_synapses": [
+      [
+        0,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_missed_synapses_00_metric_edge_count.png"
+      ],
+      [
+        1,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_missed_synapses_01_metric_total_synapses.png"
+      ],
+      [
+        2,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_missed_synapses_02_metric_total_degree_mean.png"
+      ],
+      [
+        3,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_missed_synapses_03_metric_wcc_max_size.png"
+      ],
+      [
+        4,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_missed_synapses_04_metric_scc_max_size.png"
+      ],
+      [
+        5,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_missed_synapses_05_metric_reciprocity.png"
+      ]
+    ],
+    "split_errors": [
+      [
+        0,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_split_errors_00_metric_edge_count.png"
+      ],
+      [
+        1,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_split_errors_01_metric_total_synapses.png"
+      ],
+      [
+        2,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_split_errors_02_metric_total_degree_mean.png"
+      ],
+      [
+        3,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_split_errors_03_metric_wcc_max_size.png"
+      ],
+      [
+        4,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_split_errors_04_metric_scc_max_size.png"
+      ],
+      [
+        5,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_split_errors_05_metric_reciprocity.png"
+      ]
+    ],
+    "synapse_count_measurement": [
+      [
+        0,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_synapse_count_measurement_00_metric_edge_count.png"
+      ],
+      [
+        1,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_synapse_count_measurement_01_metric_total_synapses.png"
+      ],
+      [
+        2,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_synapse_count_measurement_02_metric_total_degree_mean.png"
+      ],
+      [
+        3,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_synapse_count_measurement_03_metric_wcc_max_size.png"
+      ],
+      [
+        4,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_synapse_count_measurement_04_metric_scc_max_size.png"
+      ],
+      [
+        5,
+        "/home/surjit/Desktop/flywire/v1/analysis/figures/EM_synapse_count_measurement_05_metric_reciprocity.png"
+      ]
+    ]
+  },
+  "pr_files": {
+    "false_synapses": "/home/surjit/Desktop/flywire/v1/analysis/figures/pagerank_false_synapses.png",
+    "merge_errors": "/home/surjit/Desktop/flywire/v1/analysis/figures/pagerank_merge_errors.png",
+    "missed_synapses": "/home/surjit/Desktop/flywire/v1/analysis/figures/pagerank_missed_synapses.png",
+    "split_errors": "/home/surjit/Desktop/flywire/v1/analysis/figures/pagerank_split_errors.png",
+    "synapse_count_measurement": "/home/surjit/Desktop/flywire/v1/analysis/figures/pagerank_synapse_count_measurement.png"
+  },
+  "headline": [
+    [
+      "basic_structure",
+      "metric_edge_count",
+      "Edge count"
+    ],
+    [
+      "basic_structure",
+      "metric_total_synapses",
+      "Total synapses"
+    ],
+    [
+      "degree_distribution",
+      "metric_total_degree_mean",
+      "Mean total degree"
+    ],
+    [
+      "connected_components",
+      "metric_wcc_max_size",
+      "Largest weak component"
+    ],
+    [
+      "connected_components",
+      "metric_scc_max_size",
+      "Largest strong component"
+    ],
+    [
+      "reciprocity",
+      "metric_reciprocity",
+      "Reciprocity"
+    ]
+  ]
+}

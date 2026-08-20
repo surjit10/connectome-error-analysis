@@ -42,8 +42,8 @@ not required/
 0-final code/
 0-presentation/
 0-demo test/
-analysis/
 test_notebook/
+flywire_results_organized/
 
 # Empty dataset placeholder / local dataset staging
 0-demodata/

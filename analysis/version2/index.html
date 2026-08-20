@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How Reconstruction Errors Affect the FlyWire Connectome — Surjit Mandal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #F1F5F9;
+      --bg-surface: #FFFFFF;
+      --bg-card: #FFFFFF;
+      --bg-card-alt: #F8FAFC;
+      --cyan-neon: #0284C7;
+      --blue-electric: #2563EB;
+      --mint-vibrant: #059669;
+      --amber-gold: #D97706;
+      --coral-vivid: #DC2626;
+      --purple-accent: #7C3AED;
+      --text-pure: #0F172A;
+      --text-light: #1E293B;
+      --text-muted: #64748B;
+      --border-subtle: #E2E8F0;
+      --border-glow: rgba(37, 99, 235, 0.2);
+      --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 12% 15%, rgba(2, 132, 199, 0.05) 0%, transparent 45%),
+        radial-gradient(circle at 88% 85%, rgba(37, 99, 235, 0.05) 0%, transparent 45%),
+        linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%);
+      color: var(--text-light);
+      font-family: var(--font-main);
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top App Navigation Bar */
+    header {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 12px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .badge-pill {
+      background: linear-gradient(135deg, var(--blue-electric), var(--cyan-neon));
+      color: #FFFFFF;
+      font-size: 0.75rem;
+      font-weight: 800;
+      padding: 5px 14px;
+      border-radius: 999px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .brand-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text-pure);
+      letter-spacing: -0.2px;
+    }
+
+    .author-badge {
+      background: rgba(5, 150, 105, 0.10);
+      border: 1px solid rgba(5, 150, 105, 0.3);
+      color: var(--mint-vibrant);
+      font-size: 0.84rem;
+      font-weight: 700;
+      padding: 4px 14px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Timer Widget */
+    .timer-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg-card-alt);
+      padding: 6px 18px;
+      border-radius: 30px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .timer-display {
+      font-family: var(--font-mono);
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--blue-electric);
+      min-width: 65px;
+      text-align: center;
+      letter-spacing: 1px;
+    }
+
+    .timer-display.warning { color: var(--amber-gold); }
+    .timer-display.danger { color: var(--coral-vivid); animation: pulse 1s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .btn {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-light);
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn:hover {
+      background: #E2E8F0;
+      color: var(--text-pure);
+      border-color: var(--blue-electric);
+    }
+
+    .btn.active {
+      background: var(--blue-electric);
+      color: white;
+      border-color: var(--blue-electric);
+    }
+
+    /* Main Slide Viewport */
+    .presentation-container {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .slides-wrapper {
+      flex: 1;
+      height: 100%;
+      position: relative;
+    }
+
+    .slide {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      visibility: hidden;
+      transform: scale(0.985);
+      transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+      padding: 20px 36px 32px 36px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: scale(1);
+    }
+
+    /* Slide Header Area */
+    .slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-bottom: 8px;
+    }
+
+    .slide-category {
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--cyan-neon);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .slide-category::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cyan-neon);
+    }
+
+    .slide-title {
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: var(--text-pure);
+      letter-spacing: -0.5px;
+      line-height: 1.2;
+    }
+
+    .slide-subtitle {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .slide-pacing-badge {
+      background: #E0F2FE;
+      border: 1px solid #BAE6FD;
+      color: var(--cyan-neon);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 6px 14px;
+      border-radius: 20px;
+    }
+
+    /* 2-Column Responsive Body Layout */
+    .slide-body {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      min-height: 0;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+      position: relative;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--cyan-neon), transparent 75%);
+    }
+
+    .card.highlight-blue::before {
+      background: linear-gradient(90deg, var(--blue-electric), var(--cyan-neon));
+    }
+
+    .card.highlight-mint::before {
+      background: linear-gradient(90deg, var(--mint-vibrant), transparent 75%);
+    }
+
+    .card.highlight-coral::before {
+      background: linear-gradient(90deg, var(--coral-vivid), transparent 75%);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-pure);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Section Boxes */
+    .section-box {
+      background: #F8FAFC;
+      border-left: 3.5px solid var(--blue-electric);
+      border-radius: 0 8px 8px 0;
+      padding: 12px 16px;
+    }
+
+    .section-label {
+      font-size: 0.76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 4px;
+    }
+
+    .section-label.q { color: var(--cyan-neon); }
+    .section-label.m { color: var(--blue-electric); }
+    .section-label.r { color: var(--amber-gold); }
+    .section-label.t { color: var(--mint-vibrant); }
+    .section-label.w { color: var(--coral-vivid); }
+
+    .section-text {
+      font-size: 0.90rem;
+      line-height: 1.5;
+      color: var(--text-light);
+    }
+
+    .section-text strong {
+      color: var(--text-pure);
+    }
+
+    /* Reference Footnote Pills */
+    .ref-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #F1F5F9;
+      border: 1px solid var(--border-subtle);
+      color: #475569;
+      font-size: 0.74rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 4px;
+      margin-top: 4px;
+    }
+
+    .ref-pill.nature { border-color: #BAE6FD; color: var(--cyan-neon); background: #F0F9FF; }
+
+    /* Tables */
+    .table-container {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+      margin-top: 4px;
+    }
+
+    .table-container th {
+      background: #F1F5F9;
+      color: var(--text-pure);
+      text-align: left;
+      padding: 9px 12px;
+      font-weight: 700;
+      border-bottom: 2px solid var(--border-subtle);
+    }
+
+    .table-container td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #F1F5F9;
+      color: var(--text-light);
+    }
+
+    .table-container tr:hover td {
+      background: #F8FAFC;
+    }
+
+    /* Metric Badges & Pills */
+    .pill {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 0.80rem;
+      font-weight: 700;
+    }
+
+    .pill.red { background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; }
+    .pill.orange { background: #FEF3C7; color: #D97706; border: 1px solid #FDE68A; }
+    .pill.green { background: #DCFCE7; color: #059669; border: 1px solid #BBF7D0; }
+    .pill.blue { background: #DBEAFE; color: #2563EB; border: 1px solid #BFDBFE; }
+    .pill.cyan { background: #E0F2FE; color: #0284C7; border: 1px solid #BAE6FD; }
+
+    /* Figure Containers */
+    .figure-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+    }
+
+    .figure-container img {
+      max-width: 100%;
+      max-height: 88%;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+
+    .figure-caption {
+      font-size: 0.80rem;
+      color: var(--text-muted);
+      margin-top: 8px;
+      text-align: center;
+      font-weight: 500;
+    }
+
+    /* Presenter Notes Drawer */
+    .notes-drawer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 390px;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.98);
+      backdrop-filter: blur(20px);
+      border-left: 1px solid var(--border-subtle);
+      padding: 24px;
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      z-index: 50;
+      box-shadow: -10px 0 30px rgba(0, 0, 0, 0.08);
+    }
+
+    .notes-drawer.open {
+      transform: translateX(0);
+    }
+
+    .notes-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .notes-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--blue-electric);
+    }
+
+    .notes-body {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 0.94rem;
+      line-height: 1.6;
+      color: var(--text-light);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .cue-box {
+      background: #F0F9FF;
+      border-left: 3px solid var(--cyan-neon);
+      padding: 10px 14px;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.85rem;
+      color: var(--cyan-neon);
+      font-weight: 600;
+    }
+
+    /* Bottom Navigation Bar */
+    footer {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(16px);
+      border-top: 1px solid var(--border-subtle);
+      padding: 10px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .progress-bar-container {
+      flex: 1;
+      max-width: 420px;
+      height: 6px;
+      background: #E2E8F0;
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 0 20px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 16.66%;
+      background: linear-gradient(90deg, var(--cyan-neon), var(--blue-electric));
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+
+    .nav-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .slide-counter {
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      min-width: 60px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header Bar -->
+  <header>
+    <div class="brand">
+      <span class="badge-pill">Connectome Robustness</span>
+      <span class="brand-title">How Reconstruction Errors Affect the FlyWire Connectome</span>
+    </div>
+
+    <!-- Author Badge -->
+    <div class="author-badge">
+      <strong style="color: var(--cyan-neon);">Surjit Mandal</strong>
+    </div>
+
+    <!-- Timer Controls -->
+    <div class="timer-container">
+      <span>⏱️</span>
+      <div id="timerDisplay" class="timer-display">03:30</div>
+      <button id="timerToggleBtn" class="btn" onclick="toggleTimer()">Start</button>
+      <button id="timerResetBtn" class="btn" onclick="resetTimer()">Reset</button>
+    </div>
+
+    <div style="display: flex; gap: 8px;">
+      <button id="notesToggleBtn" class="btn active" onclick="toggleNotes()">Notes (N)</button>
+      <button id="fullscreenBtn" class="btn" onclick="toggleFullscreen()">Fullscreen (F)</button>
+    </div>
+  </header>
+
+  <!-- Presentation Container -->
+  <div class="presentation-container">
+    <div class="slides-wrapper">
+
+      <!-- SLIDE 1: Title & Overview (SURJIT MANDAL) -->
+      <div class="slide active" id="slide-1">
+        <div class="slide-header">
+          <div>
+            <div class="slide-category">RESEARCH OVERVIEW & BENCHMARK DESIGN</div>
+            <div class="slide-title">How Reconstruction Errors Affect the FlyWire Connectome</div>
+            <div class="slide-subtitle">Measuring how wiring diagram errors change network structure across 5 fruit fly connectomes</div>
+          </div>
+          <div class="slide-pacing-badge">0:00 - 0:25 (25s)</div>
+        </div>
+        <div class="slide-body">
+          <!-- Left Column: Scope & Author -->
+          <div class="card highlight-blue">
+            <div style="padding-bottom: 12px;">
+              <div style="font-size: 1.55rem; font-weight: 900; color: var(--text-pure); letter-spacing: -0.02em;">Surjit Mandal</div>
+            </div>
+
+            <div class="section-box" style="border-left-color: var(--cyan-neon);">
+              <div class="section-label q">Why This Matters</div>
+              <div class="section-text">
+                Automated AI tools make mistakes when mapping brain wiring diagrams from electron microscope images.<br><br>
+                This benchmark tests how much these errors change network connections, brain components, and neuron importance rankings.
+              </div>
+            </div>
+
+            <div class="section-box" style="border-left-color: var(--blue-electric);">
+              <div class="section-label m">Datasets Tested</div>
+              <div class="section-text">
+                • <strong>5 Drosophila Connectomes</strong>: BANC (158k), FAFB (139k), MANC (24k), MCNS (167k), MAOL (52k neurons).<br>
+                • <strong>1,030 independent simulation runs</strong> across 10 error levels (0% to 20%).<br>
+                • Tracked network connections, connected components, and PageRank rankings.
+              </div>
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto;">
+              <span class="ref-pill nature">Dorkenwald et al. Nature 2024</span>
+              <span class="ref-pill nature">Buhmann et al. Nat. Methods 2021</span>
+              <span class="ref-pill">Januszewski et al. Nat. Methods 2018</span>
+              <span class="ref-pill">Takemura et al. Nature 2023</span>
+              <span class="ref-pill">Scheffer et al. eLife 2020</span>
+            </div>
+          </div>
+
+          <!-- Right Column: The 5 Real-World Reconstruction Errors -->
+          <div class="card highlight-mint">
+            <div class="card-title">The Five Error Types Tested</div>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="background: var(--bg-card-alt); border-radius: 8px; padding: 8px 12px; border-left: 3px solid var(--orange-warn);">
+                <strong style="color: var(--text-pure); font-size: 0.9rem;">1. Missed Synapses (EM1):</strong>
+                <div style="font-size: 0.82rem; color: var(--text-muted);">The detector fails to spot a real synaptic connection.</div>
+              </div>
+              <div style="background: var(--bg-card-alt); border-radius: 8px; padding: 8px 12px; border-left: 3px solid var(--blue-electric);">
+                <strong style="color: var(--text-pure); font-size: 0.9rem;">2. False Synapses (EM2):</strong>
+                <div style="font-size: 0.82rem; color: var(--text-muted);">The detector adds a fake connection where none exists.</div>
+              </div>
+              <div style="background: var(--bg-card-alt); border-radius: 8px; padding: 8px 12px; border-left: 3px solid var(--mint-vibrant);">
+                <strong style="color: var(--text-pure); font-size: 0.9rem;">3. Synapse Count Jitter (EM3):</strong>
+                <div style="font-size: 0.82rem; color: var(--text-muted);">Small counting errors in individual synapse numbers.</div>
+              </div>
+              <div style="background: var(--bg-card-alt); border-radius: 8px; padding: 8px 12px; border-left: 3px solid var(--purple-accent);">
+                <strong style="color: var(--text-pure); font-size: 0.9rem;">4. Split Neurons (EM4):</strong>
+                <div style="font-size: 0.82rem; color: var(--text-muted);">A single biological neuron gets broken into fragments.</div>
+              </div>
+              <div style="background: var(--bg-card-alt); border-radius: 8px; padding: 8px 12px; border-left: 3px solid var(--coral-vivid);">
+                <strong style="color: var(--text-pure); font-size: 0.9rem;">5. Merged Neurons (EM5):</strong>
+                <div style="font-size: 0.82rem; color: var(--text-muted);">Two distinct neurons get accidentally joined together.</div>
+              </div>
+            </div>
+
+            <div class="section-box" style="border-left-color: var(--mint-vibrant); margin-top: auto;">
+              <div class="section-label t">Main Goal</div>
+              <div class="section-text">
+                Provide clear sensitivity benchmarks showing how each error type affects brain graph measurements.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 2: Global Results Heatmap -->
+      <div class="slide" id="slide-2">
+        <div class="slide-header">
+          <div>
+            <div class="slide-category">GLOBAL ERROR COMPARISON</div>
+            <div class="slide-title">How Each Error Type Changes the Graph</div>
+            <div class="slide-subtitle">Comparing network changes across all 5 connectomes</div>
+          </div>
+          <div class="slide-pacing-badge">0:25 - 1:00 (35s)</div>
+        </div>
+        <div class="slide-body">
+          <div class="card">
+            <div class="section-box">
+              <div class="section-label q">Overall Error Impact</div>
+              <div class="section-text">
+                Each error type produces a distinct pattern of change across the connectome.
+              </div>
+            </div>
+
+            <table class="table-container">
+              <thead>
+                <tr>
+                  <th>Error Model</th>
+                  <th>Δ Edge Count (Avg & Range)</th>
+                  <th>Δ Total Synapses</th>
+                  <th>Δ Weight Var</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Missed Synapses (n=5)</strong></td>
+                  <td><span class="pill orange">-4.9%</span> <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">[-0.01% .. -9.7%]</span></td>
+                  <td><span class="pill red">-20.0%</span></td>
+                  <td><span class="pill red">-30.3%</span></td>
+                </tr>
+                <tr>
+                  <td><strong>False Synapses (n=3)</strong></td>
+                  <td><span class="pill blue">+19.4%</span> <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">[+18.2% .. +20.0%]</span></td>
+                  <td><span class="pill blue">+7.6%</span></td>
+                  <td><span class="pill orange">-13.8%</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Synapse Count Noise (n=5)</strong></td>
+                  <td><span class="pill green">0.0%</span> <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">[all 5 datasets]</span></td>
+                  <td><span class="pill green">+0.03%</span></td>
+                  <td><span class="pill green">+5.5%</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Split Neurons (n=5)</strong></td>
+                  <td><span class="pill green">0.0%</span> <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">[all 5 datasets]</span></td>
+                  <td><span class="pill green">0.0%</span></td>
+                  <td><span class="pill green">0.0%</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Merged Neurons (n=4)</strong></td>
+                  <td><span class="pill red">-10.9%</span> <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">[-7.1% .. -16.1%]</span></td>
+                  <td><span class="pill green">-0.1%</span></td>
+                  <td><span class="pill red">+46.9%</span></td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="section-box" style="border-left-color: var(--mint-vibrant); margin-top: auto;">
+              <div class="section-label t">Main Takeaway</div>
+              <div class="section-text">
+                Synapse count noise and neuron splits <strong>do not change the total number of connections</strong>. Merged neurons caused the largest structural changes (-10.9% mean edge loss, +46.9% weight variance increase).
+              </div>
+            </div>
+
+            <div style="font-size: 0.74rem; color: var(--text-muted);">
+              Note: n varies by model (n=3 to 5). At typical residual error levels (2–5%), reported aggregate metrics change by &lt;1%.
+            </div>
+          </div>
+
+          <div class="figure-container">
+            <img src="./figures/clean_fig_global_fingerprints.png" alt="Global Error Fingerprints Chart">
+            <div class="figure-caption">Mean percentage shift across 5 connectomes at 20% error rate.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 3: Finding 1: Missed Synapses & Binomial Buffering -->
+      <div class="slide" id="slide-3">
+        <div class="slide-header">
+          <div>
+            <div class="slide-category">MISSED SYNAPSE ANALYSIS</div>
+            <div class="slide-title">Why Missed Synapses Do Not Proportionally Eliminate Connections</div>
+            <div class="slide-subtitle">Connections with multiple synapses provide built-in protection against loss</div>
+          </div>
+          <div class="slide-pacing-badge">1:00 - 1:40 (40s)</div>
+        </div>
+        <div class="slide-body">
+          <div class="card">
+            <div class="section-box">
+              <div class="section-label q">Synapse Loss vs Connection Loss</div>
+              <div class="section-text">
+                Evaluating whether losing 20% of synapses removes 20% of graph connections.
+              </div>
+            </div>
+
+            <div class="section-box" style="border-left-color: var(--blue-electric);">
+              <div class="section-label m">Main Results</div>
+              <div class="section-text">
+                • Total synapses drop by <strong>~20.0%</strong>.<br>
+                • Connection count drops by only: <strong>-4.87%</strong> (~4× smaller than synapse loss).<br>
+                • Largest Connected Core (SCC) shrinks by only: <strong>-0.04%</strong>.
+              </div>
+            </div>
+
+            <div class="section-box" style="border-left-color: var(--mint-vibrant); margin-top: auto;">
+              <div class="section-label t">Why This Happens</div>
+              <div class="section-text">
+                In real connectomes, many connections have multiple synapses. A connection is only lost if <em>every single synapse</em> on it is missed (<code>P = p<sup>w</sup></code>).<br><br>
+                Under a 20% miss rate (illustrative example):<br>
+                • 1-synapse edge: 20.0% chance of loss<br>
+                • 5-synapse edge: 0.03% chance of loss<br><br>
+                <em>Connections with more synapses are strongly protected from disappearing.</em>
+              </div>
+            </div>
+
+            <div style="font-size: 0.74rem; color: var(--text-muted);">
+              Error model rates are motivated by automated synapse detection studies (<em>Buhmann et al. 2021</em>).
+            </div>
+          </div>
+
+          <div class="figure-container">
+            <img src="./figures/clean_fig_binomial_buffering.png" alt="Binomial Buffering Curve">
+            <div class="figure-caption">~4× Smaller Edge Loss: Total Synapses drops 1-to-1 while Edge Count is strongly protected.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 4: Finding 2: Split vs Merge Asymmetry -->
+      <div class="slide" id="slide-4">
+        <div class="slide-header">
+          <div>
+            <div class="slide-category">SPLIT VS MERGE COMPARISON</div>
+            <div class="slide-title">Merging Neurons Produces Larger Changes in Edge Count and Weight Variance</div>
+            <div class="slide-subtitle">Neuron merges reduce edge count and strongly increase connection-weight variance</div>
+          </div>
+          <div class="slide-pacing-badge">1:40 - 2:20 (40s)</div>
+        </div>
+        <div class="slide-body">
+          <div class="card highlight-coral">
+            <div class="section-box">
+              <div class="section-label q">Splits vs Merges</div>
+              <div class="section-text">
+                Comparing what happens when neurons are split into pieces versus when separate neurons are accidentally merged.
+              </div>
+            </div>
+
+            <div style="font-size: 0.85rem; font-weight: 800; color: var(--amber-gold); margin-bottom: 4px;">
+              HEAD-TO-HEAD COMPARISON AT HIGHEST TESTED ERROR LEVEL (20%)
+            </div>
+
+            <table class="table-container">
+              <thead>
+                <tr>
+                  <th>Graph Metric</th>
+                  <th>Split Neurons (n=5)</th>
+                  <th>Merged Neurons (n=4)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Edge Count Change</strong></td>
+                  <td><span class="pill green">0.0%</span></td>
+                  <td><span class="pill red">-10.9%</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Total Synapse Change</strong></td>
+                  <td><span class="pill green">0.0%</span></td>
+                  <td><span class="pill green">-0.1%</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Mean Degree</strong></td>
+                  <td><span class="pill orange">-14.9%</span></td>
+                  <td><span class="pill orange">-2.6%</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Largest Strongly Connected Component (SCC)</strong></td>
+                  <td><span class="pill blue">+17.6%</span></td>
+                  <td><span class="pill red">-9.0%</span></td>
+                </tr>
+                <tr>
+                  <td><strong>Weight Variance</strong></td>
+                  <td><span class="pill green">0.0%</span></td>
+                  <td><span class="pill red">+46.9%</span></td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="section-box" style="border-left-color: var(--coral-vivid); margin-top: auto;">
+              <div class="section-label w">Key Takeaway</div>
+              <div class="section-text">
+                Splitting redistributes existing connections across fragments while preserving total edge and synapse counts. Merging combines neurons, reducing edge count by 10.9% and increasing weight variance by 46.9%.
+              </div>
+            </div>
+
+            <div style="font-size: 0.74rem; color: var(--text-muted);">
+              Splits and merges are important reconstruction error types in automated EM segmentation (<em>Dorkenwald et al., 2024; Januszewski et al., 2018</em>).
+            </div>
+          </div>
+
+          <div class="figure-container">
+            <img src="./figures/clean_fig_split_vs_merge.png" alt="Split vs Merge Asymmetry Chart">
+            <div class="figure-caption">Head-to-head comparison demonstrating the destructive asymmetry of Merge errors.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 5: Finding 3: PageRank & Median Law -->
+      <div class="slide" id="slide-5">
+        <div class="slide-header">
+          <div>
+            <div class="slide-category">CENTRALITY & CONNECTOME COMPARISON</div>
+            <div class="slide-title">PageRank Remains Stable; Higher Connection Strength Is Associated With Lower Edge Loss</div>
+            <div class="slide-subtitle">PageRank similarity to baseline remains high (r ≥ 0.977); edge loss varies with median connection weight</div>
+          </div>
+          <div class="slide-pacing-badge">2:20 - 3:00 (40s)</div>
+        </div>
+        <div class="slide-body">
+          <div class="card">
+            <div class="section-box">
+              <div class="section-label q">Centrality & Wiring Resilience</div>
+              <div class="section-text">
+                Testing whether neuron importance rankings stay reliable and how observed edge loss varies across connectomes.
+              </div>
+            </div>
+
+            <div class="section-box" style="border-left-color: var(--cyan-neon);">
+              <div class="section-label r">1. PageRank Similarity to Baseline Remains High</div>
+              <div class="section-text">
+                • PageRank remains highly correlated with the unperturbed baseline across the tested error models.<br>
+                • Pearson correlations range from approximately <strong>0.977 to 1.000</strong> (mean r = 0.999 under missed synapses).<br>
+                • PageRank rankings remain highly similar to the baseline under the tested perturbations.
+              </div>
+            </div>
+
+            <div class="section-box" style="border-left-color: var(--amber-gold);">
+              <div class="section-label r">2. Higher Connection Strength Is Associated With Lower Edge Loss</div>
+              <div class="section-text">
+                Under the 20% missed-synapse perturbation, observed edge loss varies across connectomes with different median connection weights:<br>
+                • <strong>MCNS</strong> (median wt 9.0): <strong>-0.007%</strong> edge count change<br>
+                • <strong>FAFB</strong> (median wt 6.0): <strong>-2.50%</strong> edge count change<br>
+                • <strong>BANC</strong> (median wt 4.0): <strong>-3.19%</strong> edge count change<br>
+                • <strong>MAOL</strong> (median wt 2.0): <strong>-8.92%</strong> edge count change<br>
+                • <strong>MANC</strong> (median wt 2.0): <strong>-9.73%</strong> edge count change
+              </div>
+            </div>
+
+            <div class="section-box" style="border-left-color: var(--mint-vibrant); margin-top: auto;">
+              <div class="section-label t">Main Takeaway</div>
+              <div class="section-text">
+                PageRank remains highly similar to baseline under the tested perturbations, while connectomes with higher median connection weights show lower observed edge loss under the missed-synapse model.
+              </div>
+            </div>
+
+            <div style="font-size: 0.74rem; color: var(--text-muted);">
+              Note: Observations reflect cross-connectome associations across the 5 tested datasets (<em>Scheffer et al. eLife 2020</em>).
+            </div>
+          </div>
+
+          <div class="figure-container">
+            <img src="./figures/clean_fig_pagerank_and_median_law.png" alt="PageRank Stability and Connection Strength Chart">
+            <div class="figure-caption">Left: PageRank stability (r &ge; 0.977). Right: Edge loss vs baseline median synaptic weight.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 6: Secondary Effects of Reconstruction Errors -->
+      <div class="slide" id="slide-6">
+        <div class="slide-header">
+          <div>
+            <div class="slide-category">SECONDARY ERROR FINGERPRINTS</div>
+            <div class="slide-title">Secondary Effects of Reconstruction Errors</div>
+            <div class="slide-subtitle">Different reconstruction errors leave different fingerprints beyond the quantity directly perturbed.</div>
+          </div>
+          <div class="slide-pacing-badge">3:00 - 3:30 (30s)</div>
+        </div>
+        <div class="slide-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+          <!-- Left Column: Models 1, 2, 3 -->
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <!-- Card 1: Missed Synapses -->
+            <div class="card" style="padding: 10px 14px; border-top: 3px solid var(--cyan-neon);">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div style="font-weight: 800; font-size: 0.88rem; color: var(--cyan-neon);">1. MISSED SYNAPSES</div>
+                <div style="font-size: 0.74rem; color: var(--text-muted);">Direct: 20% of synapses are removed</div>
+              </div>
+              <div style="margin: 4px 0;">
+                <span style="font-size: 0.70rem; font-weight: 800; color: var(--mint-vibrant);">SECONDARY EFFECT: </span>
+                <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-pure);">Many individual synapses can be lost while most neuron-to-neuron connections remain.</span>
+              </div>
+              <div style="font-size: 0.74rem; font-weight: 700; color: var(--blue-accent);">
+                Evidence: &minus;20.0% synapses &nbsp;|&nbsp; &minus;4.9% connections &nbsp;|&nbsp; PageRank r = 0.999
+              </div>
+            </div>
+
+            <!-- Card 2: False Synapses -->
+            <div class="card" style="padding: 10px 14px; border-top: 3px solid var(--blue-accent);">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div style="font-weight: 800; font-size: 0.88rem; color: var(--blue-accent);">2. FALSE SYNAPSES</div>
+                <div style="font-size: 0.74rem; color: var(--text-muted);">Direct: New false connections are added</div>
+              </div>
+              <div style="margin: 4px 0;">
+                <span style="font-size: 0.70rem; font-weight: 800; color: var(--mint-vibrant);">SECONDARY EFFECT: </span>
+                <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-pure);">Many new connections are added, but they are relatively weak, so connection count grows much faster than total synaptic strength.</span>
+              </div>
+              <div style="font-size: 0.74rem; font-weight: 700; color: var(--blue-accent);">
+                Evidence: +19.4% connections &nbsp;|&nbsp; +7.6% synapses &nbsp;|&nbsp; &minus;13.8% weight variance
+              </div>
+            </div>
+
+            <!-- Card 3: Count Noise -->
+            <div class="card" style="padding: 10px 14px; border-top: 3px solid var(--mint-vibrant);">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div style="font-weight: 800; font-size: 0.88rem; color: var(--mint-vibrant);">3. SYNAPSE-COUNT NOISE</div>
+                <div style="font-size: 0.74rem; color: var(--text-muted);">Direct: Connection weights changed; graph unchanged</div>
+              </div>
+              <div style="margin: 4px 0;">
+                <span style="font-size: 0.70rem; font-weight: 800; color: var(--mint-vibrant);">SECONDARY EFFECT: </span>
+                <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-pure);">The network structure stays the same, but connection strengths become less reliable.</span>
+              </div>
+              <div style="font-size: 0.74rem; font-weight: 700; color: var(--blue-accent);">
+                Evidence: 0.0% connection change &nbsp;|&nbsp; 0.0% degree/SCC &nbsp;|&nbsp; +5.5% weight variance
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Models 4, 5 & Synthesis -->
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <!-- Card 4: Split Errors -->
+            <div class="card" style="padding: 10px 14px; border-top: 3px solid var(--purple-accent);">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div style="font-weight: 800; font-size: 0.88rem; color: var(--purple-accent);">4. SPLIT ERRORS</div>
+                <div style="font-size: 0.74rem; color: var(--text-muted);">Direct: Neurons split into multiple neuron pieces</div>
+              </div>
+              <div style="margin: 4px 0;">
+                <span style="font-size: 0.70rem; font-weight: 800; color: var(--mint-vibrant);">SECONDARY EFFECT: </span>
+                <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-pure);">Connections are kept, but they are spread across more neurons. This lowers connections per neuron and changes the largest connected group.</span>
+              </div>
+              <div style="font-size: 0.74rem; font-weight: 700; color: var(--blue-accent);">
+                Evidence: +17.5% neurons &nbsp;|&nbsp; 0.0% connection loss &nbsp;|&nbsp; &minus;14.9% mean degree &nbsp;|&nbsp; +17.6% largest SCC
+              </div>
+            </div>
+
+            <!-- Card 5: Merge Errors -->
+            <div class="card" style="padding: 10px 14px; border-top: 3px solid var(--coral-vivid);">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div style="font-weight: 800; font-size: 0.88rem; color: var(--coral-vivid);">5. MERGE ERRORS</div>
+                <div style="font-size: 0.74rem; color: var(--text-muted);">Direct: Multiple neurons combined into one</div>
+              </div>
+              <div style="margin: 4px 0;">
+                <span style="font-size: 0.70rem; font-weight: 800; color: var(--mint-vibrant);">SECONDARY EFFECT: </span>
+                <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-pure);">Most synapses remain, but merging neurons combines separate connections into fewer and much stronger-looking connections.</span>
+              </div>
+              <div style="font-size: 0.74rem; font-weight: 700; color: var(--blue-accent);">
+                Evidence: &minus;0.1% synapses &nbsp;|&nbsp; &minus;10.9% connections &nbsp;|&nbsp; +46.9% weight variance &nbsp;|&nbsp; &minus;9.0% largest SCC
+              </div>
+            </div>
+
+            <!-- Card 6: QC Synthesis & Takeaway -->
+            <div class="card highlight-blue" style="padding: 10px 14px; border-top: 3px solid var(--amber-gold); margin-top: auto;">
+              <div style="font-weight: 800; font-size: 0.86rem; color: var(--amber-gold); margin-bottom: 3px;">
+                KEY QUALITY-CONTROL TAKEAWAY
+              </div>
+              <div style="font-size: 0.76rem; font-weight: 700; color: var(--text-pure); line-height: 1.35; margin-bottom: 4px;">
+                Each error changes the network in more ways than the direct error itself. Some errors mainly change connections, some change connection strength, and others change how connections are distributed across neurons.
+              </div>
+              <div style="font-size: 0.74rem; font-weight: 700; color: var(--blue-accent); margin-bottom: 4px;">
+                Reliable connectome quality checks therefore need to look at several network measurements, not just one.
+              </div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.70rem; color: var(--text-muted); font-weight: 700; border-top: 1px solid var(--border-soft); padding-top: 4px;">
+                <span>BENCHMARK: 5 connectomes &bull; 10 error levels &bull; 1,030 runs</span>
+                <span>Surjit Mandal</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SLIDE 7: Appendix — Complete 5-Connectome Breakdown Table -->
+      <div class="slide" id="slide-7">
+        <div class="slide-header">
+          <div>
+            <div class="slide-category">APPENDIX & FULL DATASET COMPARISON</div>
+            <div class="slide-title">Individual Connectome Breakdown Table</div>
+            <div class="slide-subtitle">Comparing exact Δ Edge Count and metrics across BANC, FAFB, MANC, MCNS, and MAOL (at 20% Peak Error)</div>
+          </div>
+          <div class="slide-pacing-badge">Q&A / Reference</div>
+        </div>
+        <div class="slide-body">
+          <!-- Left Column: Missed & Merge Breakdown -->
+          <div class="card highlight-blue">
+            <div class="section-box" style="border-left-color: var(--cyan-neon);">
+              <div class="section-label q">1. Missed Synapses (EM1) Breakdown</div>
+              <table class="table-container" style="font-size:0.80rem;">
+                <thead>
+                  <tr>
+                    <th>Connectome</th>
+                    <th>Median W</th>
+                    <th>Δ Edge Count</th>
+                    <th>PageRank r</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>BANC</td><td>4.0</td><td><span class="pill orange">-3.19%</span></td><td>0.998</td></tr>
+                  <tr><td>FAFB</td><td>6.0</td><td><span class="pill orange">-2.50%</span></td><td>1.000</td></tr>
+                  <tr><td>MANC</td><td>2.0</td><td><span class="pill red">-9.73%</span></td><td>0.998</td></tr>
+                  <tr><td>MCNS</td><td>9.0</td><td><span class="pill green">-0.007%</span></td><td>1.000</td></tr>
+                  <tr><td>MAOL</td><td>2.0</td><td><span class="pill red">-8.92%</span></td><td>0.999</td></tr>
+                  <tr style="border-top:2px solid var(--border-subtle); font-weight:bold;">
+                    <td>MEAN (n=5)</td><td>4.6</td><td><span class="pill orange">-4.87%</span></td><td>0.999</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="section-box" style="border-left-color: var(--coral-vivid); margin-top: 8px;">
+              <div class="section-label w">2. Merged Neurons (EM5) Breakdown</div>
+              <table class="table-container" style="font-size:0.80rem;">
+                <thead>
+                  <tr>
+                    <th>Connectome</th>
+                    <th>Δ Edge Count</th>
+                    <th>Δ Weight Var</th>
+                    <th>Largest SCC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>BANC</td><td><span class="pill red">-12.18%</span></td><td><span class="pill red">+59.87%</span></td><td>-8.30%</td></tr>
+                  <tr><td>FAFB</td><td><span class="pill red">-16.09%</span></td><td><span class="pill red">+64.98%</span></td><td>-9.33%</td></tr>
+                  <tr><td>MANC</td><td><span class="pill orange">-8.27%</span></td><td><span class="pill orange">+24.46%</span></td><td>-9.98%</td></tr>
+                  <tr><td>MCNS</td><td><span class="pill orange">-7.12%</span></td><td><span class="pill red">+38.20%</span></td><td>-8.24%</td></tr>
+                  <tr style="border-top:2px solid var(--border-subtle); font-weight:bold;">
+                    <td>MEAN (n=4)</td><td><span class="pill red">-10.91%</span></td><td><span class="pill red">+46.88%</span></td><td>-8.96%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Right Column: False Synapses, Splits, & Baselines -->
+          <div class="card highlight-mint">
+            <div class="section-box" style="border-left-color: var(--blue-electric);">
+              <div class="section-label m">3. False Synapses (EM2) Breakdown</div>
+              <table class="table-container" style="font-size:0.80rem;">
+                <thead>
+                  <tr>
+                    <th>Connectome</th>
+                    <th>Δ Edge Count</th>
+                    <th>Δ Synapses</th>
+                    <th>Δ Weight Var</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>BANC</td><td><span class="pill blue">+20.00%</span></td><td>+10.02%</td><td>-15.03%</td></tr>
+                  <tr><td>FAFB</td><td><span class="pill blue">+20.00%</span></td><td>+6.58%</td><td>-13.90%</td></tr>
+                  <tr><td>MCNS</td><td><span class="pill blue">+18.18%</span></td><td>+6.32%</td><td>-12.61%</td></tr>
+                  <tr style="border-top:2px solid var(--border-subtle); font-weight:bold;">
+                    <td>MEAN (n=3)</td><td><span class="pill blue">+19.39%</span></td><td>+7.64%</td><td>-13.85%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="section-box" style="border-left-color: var(--mint-vibrant); margin-top: 8px;">
+              <div class="section-label t">4. Split Neurons (EM4) Across All 5 Datasets</div>
+              <div class="section-text" style="font-size:0.84rem;">
+                Across BANC, FAFB, MANC, MCNS, and MAOL:<br>
+                • <strong>Δ Edge Count</strong>: 0.0% (100% preserved in all 5 datasets)<br>
+                • <strong>Δ Total Synapses</strong>: 0.0% (100% preserved in all 5 datasets)<br>
+                • <strong>Mean Degree</strong>: drops by -12.8% to -16.0% (mean -14.9%)<br>
+                • <strong>Largest Core (SCC)</strong>: shifts by +14.9% to +19.2% (mean +17.6%)
+              </div>
+            </div>
+
+            <div class="section-box" style="border-left-color: var(--border-subtle); margin-top: auto;">
+              <div class="section-label q" style="color:var(--text-muted);">5. Baseline Connectome Sizes</div>
+              <div class="section-text" style="font-size:0.80rem; color:var(--text-muted);">
+                BANC: 158k | FAFB: 139k | MANC: 24k | MCNS: 167k | MAOL: 52k
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Notes Side Drawer -->
+    <div class="notes-drawer open" id="notesDrawer">
+      <div class="notes-header">
+        <div class="notes-title">Speaker Script & Cues</div>
+        <span class="pill blue" id="notesSlidePill">Slide 1 / 7</span>
+      </div>
+      <div class="notes-body" id="notesBody">
+        <!-- Notes content populated dynamically via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer Navigation Bar -->
+  <footer>
+    <div style="font-size: 0.85rem; color: var(--text-muted);">
+      <strong style="color: var(--cyan-neon);">Surjit Mandal</strong> | How Reconstruction Errors Affect the FlyWire Connectome | Keyboard: <kbd>Space</kbd>/<kbd>&rarr;</kbd> Next | <kbd>&larr;</kbd> Prev | <kbd>N</kbd> Notes | <kbd>T</kbd> Timer | <kbd>F</kbd> Fullscreen
+    </div>
+
+    <div class="progress-bar-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="nav-controls">
+      <button class="btn" onclick="prevSlide()">❮ Prev</button>
+      <span class="slide-counter" id="slideCounter">1 / 7</span>
+      <button class="btn" onclick="nextSlide()">Next ❯</button>
+    </div>
+  </footer>
+
+  <script>
+    const TOTAL_SLIDES = 7;
+    let currentSlide = 1;
+    let timerSeconds = 210; // 3:30 (210s)
+    let timerInterval = null;
+    let timerRunning = false;
+
+    const scripts = {
+      1: {
+        cue: "State your name, Surjit Mandal, point to 'Why This Matters' and the 5 Error Types card.",
+        text: "Good morning. I am Surjit Mandal. In modern neuroscience, automated AI tools map brain wiring diagrams with millions of connections. But these tools make errors.<br><br>Our core question is: <strong>When these errors enter a connectome, how much do network connections and brain properties change, and which error types cause the most damage?</strong><br><br>We tested five fruit fly connectomes across five error types over 1,030 simulation runs."
+      },
+      2: {
+        cue: "Point to the Global Fingerprints bar chart and highlight the 0.0% row vs the +46.9% row.",
+        text: "Here is our summary across all five datasets at the highest tested error rate of 20%.<br><br>Notice that <strong>Synapse Count Noise</strong> and <strong>Split Neurons</strong> do not delete any graph connections. In contrast, <strong>Merged Neurons</strong> caused the largest structural changes, removing 11% of edges and inflating connection weight variance by 47%.<br><br>The key takeaway: network structure is very stable against simple counting noise, but highly sensitive when neurons are accidentally merged."
+      },
+      3: {
+        cue: "Point to the green 4-fold buffering zone and explain the mathematical redundancy.",
+        text: "Our first major finding explains why missed synapses do not delete connections at a one-to-one rate.<br><br>When our simulation removes 20% of all synapses, actual connection count drops by only <strong>4.87%</strong>—about 4 times smaller than the synapse loss.<br><br>Why? In real brains, many connections share multiple synapses. A connection is only lost if every single synapse on it is missed. Stronger connections with multiple synapses are naturally protected from disappearing."
+      },
+      4: {
+        cue: "Point to the comparison chart contrasting Split (0.0% edge loss) vs Merge (-10.9% edge loss).",
+        text: "Next: How does splitting a neuron compare to merging neurons?<br><br>Our simulations show that <strong>Split errors</strong> divide a neuron across pieces but preserve 100% of graph connections and total synapses. In contrast, <strong>Merge errors</strong> combine two distinct neurons into one, deleting 11% of connections and boosting weight variance by 47%.<br><br>Merging neurons causes far more structural distortion than splitting."
+      },
+      5: {
+        cue: "Point to the PageRank stability plot and the MANC vs MCNS comparison.",
+        text: "Third: How do neuron importance rankings and connection strengths behave?<br><br>First, PageRank rankings remain highly stable across tested error models, with Pearson <strong>r between 0.977 and 1.000</strong>.<br><br>Second, datasets with stronger connections lose far fewer edges: MANC, with a median weight of 2, loses 9.7% of edges, while MCNS, with a median weight of 9, loses only 0.007% (-0.007%)."
+      },
+      6: {
+        cue: "Point to the Error Impact Summary table and conclude.",
+        text: "To summarize our findings:<br><br>Different reconstruction errors produce very different network impacts. Merges cause the largest structural damage, while missed synapses show substantial synapse loss but buffered edge loss.<br><br>When reviewing and cleaning connectomes, proofreaders should prioritize finding and fixing merge errors and missed synapses.<br><br>I am Surjit Mandal. Thank you for your time and attention!"
+      },
+      7: {
+        cue: "Use during Q&A if anyone asks about a specific connectome (BANC, FAFB, MANC, MCNS, MAOL).",
+        text: "This appendix slide details the exact percentage shifts across all five individual connectomes.<br><br>Notice that under Missed Synapses, MCNS loses only 0.007% of edges due to its high median weight of 9, whereas MANC loses 9.7% with a median weight of 2. In all datasets, Split errors preserved 100% of connections, while Merge errors caused the largest damage across all tested graphs."
+      }
+    };
+
+    function updateSlide() {
+      // Update Slide visibility
+      document.querySelectorAll('.slide').forEach((s, idx) => {
+        if (idx + 1 === currentSlide) {
+          s.classList.add('active');
+        } else {
+          s.classList.remove('active');
+        }
+      });
+
+      // Update Slide Counter & Progress Bar
+      document.getElementById('slideCounter').textContent = `${currentSlide} / ${TOTAL_SLIDES}`;
+      document.getElementById('progressBar').style.width = `${(currentSlide / TOTAL_SLIDES) * 100}%`;
+      document.getElementById('notesSlidePill').textContent = `Slide ${currentSlide} / ${TOTAL_SLIDES}`;
+
+      // Update Notes Drawer content
+      const note = scripts[currentSlide];
+      document.getElementById('notesBody').innerHTML = `
+        <div class="cue-box">${note.cue}</div>
+        <div style="font-size: 0.95rem; line-height: 1.6; color: var(--text-light);">${note.text}</div>
+      `;
+    }
+
+    function nextSlide() {
+      if (currentSlide < TOTAL_SLIDES) {
+        currentSlide++;
+        updateSlide();
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) {
+        currentSlide--;
+        updateSlide();
+      }
+    }
+
+    function toggleNotes() {
+      const drawer = document.getElementById('notesDrawer');
+      const btn = document.getElementById('notesToggleBtn');
+      drawer.classList.toggle('open');
+      btn.classList.toggle('active');
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => alert(`Fullscreen error: ${err.message}`));
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    function toggleTimer() {
+      const btn = document.getElementById('timerToggleBtn');
+      if (timerRunning) {
+        clearInterval(timerInterval);
+        timerRunning = false;
+        btn.textContent = 'Start';
+        btn.classList.remove('active');
+      } else {
+        timerRunning = true;
+        btn.textContent = 'Pause';
+        btn.classList.add('active');
+        timerInterval = setInterval(() => {
+          if (timerSeconds > 0) {
+            timerSeconds--;
+            renderTimer();
+          } else {
+            clearInterval(timerInterval);
+            timerRunning = false;
+            btn.textContent = 'Done';
+          }
+        }, 1000);
+      }
+    }
+
+    function resetTimer() {
+      clearInterval(timerInterval);
+      timerRunning = false;
+      timerSeconds = 210;
+      document.getElementById('timerToggleBtn').textContent = 'Start';
+      document.getElementById('timerToggleBtn').classList.remove('active');
+      renderTimer();
+    }
+
+    function renderTimer() {
+      const mins = Math.floor(timerSeconds / 60);
+      const secs = timerSeconds % 60;
+      const display = document.getElementById('timerDisplay');
+      display.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+      display.classList.remove('warning', 'danger');
+      if (timerSeconds <= 30) {
+        display.classList.add('danger');
+      } else if (timerSeconds <= 60) {
+        display.classList.add('warning');
+      }
+    }
+
+    // Keyboard Shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' || e.code === 'ArrowRight') {
+        e.preventDefault();
+        nextSlide();
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        prevSlide();
+      } else if (e.key === 'n' || e.key === 'N') {
+        toggleNotes();
+      } else if (e.key === 'f' || e.key === 'F') {
+        toggleFullscreen();
+      } else if (e.key === 't' || e.key === 'T') {
+        toggleTimer();
+      }
+    });
+
+    // Initialize
+    updateSlide();
+    renderTimer();
+  </script>
+</body>
+</html>

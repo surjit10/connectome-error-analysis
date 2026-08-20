@@ -39,6 +39,7 @@ METRIC_COLORS = {
     "Total synapses":          "#00695C",   # teal
     "Mean total degree":       "#6A1B9A",   # purple
     "Largest weak component":  "#E65100",   # deep orange
+    "Largest strong component":"#00838F",   # cyan
     "Reciprocity":             "#558B2F",   # olive green
 }
 
@@ -64,12 +65,13 @@ ANALYSIS_COLS = {
     "reciprocity": ["metric_reciprocity"],
 }
 
-# 5 headline metrics shown in all sensitivity figures
+# 6 headline metrics shown in all sensitivity figures
 HEADLINE = [
     ("basic_structure",      "metric_edge_count",        "Edge count"),
     ("basic_structure",      "metric_total_synapses",    "Total synapses"),
     ("degree_distribution",  "metric_total_degree_mean", "Mean total degree"),
     ("connected_components", "metric_wcc_max_size",      "Largest weak component"),
+    ("connected_components", "metric_scc_max_size",      "Largest strong component"),
     ("reciprocity",          "metric_reciprocity",       "Reciprocity"),
 ]
 
@@ -404,7 +406,8 @@ def plot_pagerank_single(em, pr_all, rmax, y_lo, BANDS):
 # ─── Figure 4 · heatmap ───────────────────────────────────────────────────────
 def plot_heatmap(rel, ems_present):
     SAFE = ["metric_edge_count", "metric_total_synapses", "metric_weight_variance",
-            "metric_total_degree_mean", "metric_wcc_max_size", "metric_reciprocity"]
+            "metric_total_degree_mean", "metric_wcc_max_size", "metric_scc_count",
+            "metric_reciprocity"]
     grp_rel = rel[rel.metric.isin(SAFE)].copy()
     rows = []
     for (ds, em), grp in grp_rel.groupby(["dataset", "error_model"]):
@@ -417,9 +420,24 @@ def plot_heatmap(rel, ems_present):
         rows.append({"dataset": ds, "error_model": em,
                      "max_abs_change_pct": best.ab,
                      "metric": best.metric, "rate": best.rate})
+    METRIC_SHORT = {
+        "metric_edge_count": "Edges",
+        "metric_total_synapses": "Synapses",
+        "metric_weight_variance": "Wt. var.",
+        "metric_total_degree_mean": "Degree",
+        "metric_wcc_max_size": "WCC",
+        "metric_scc_count": "SCC count",
+        "metric_reciprocity": "Reciprocity"
+    }
+
     mtrx = (pd.DataFrame(rows)
               .pivot(index="dataset", columns="error_model",
                      values="max_abs_change_pct")
+              .reindex(index=DATASETS, columns=ems_present))
+              
+    mtrx_m = (pd.DataFrame(rows)
+              .pivot(index="dataset", columns="error_model",
+                     values="metric")
               .reindex(index=DATASETS, columns=ems_present))
 
     fig, ax = plt.subplots(figsize=(13, 5.5), facecolor="white")
@@ -434,10 +452,12 @@ def plot_heatmap(rel, ems_present):
     for i in range(len(DATASETS)):
         for j in range(len(ems_present)):
             v = mtrx.values[i, j]
+            m = mtrx_m.values[i, j]
             if np.isfinite(v):
                 text_color = "white" if v > 45 else "#111111"
-                ax.text(j, i, f"{v:.1f}%", ha="center", va="center",
-                        fontsize=11.5, color=text_color, weight="bold")
+                short_m = METRIC_SHORT.get(m, str(m))
+                ax.text(j, i, f"{v:.1f}%\n({short_m})", ha="center", va="center",
+                        fontsize=10.5, color=text_color, weight="bold")
             else:
                 ax.text(j, i, "n/a", ha="center", va="center",
                         fontsize=10.5, color="#aaaaaa", style="italic")
