@@ -89,10 +89,16 @@ class HypothesisTestEngine:
         if not comparisons:
             return []
 
-        # Only secondary emergent metrics participate in FDR correction family
+        # Only secondary emergent metrics with valid p-values participate in
+        # FDR correction.  Exclude:
+        #   - primary_imposed / control_invariant (mechanically determined)
+        #   - zero_variance_indeterminate (both groups identical, no test)
+        #   - p_value is None (insufficient data or n<3)
         secondary_indices = [
             i for i, c in enumerate(comparisons)
-            if c.category == "secondary_emergent" and c.p_value is not None
+            if c.category == "secondary_emergent"
+            and c.p_value is not None
+            and c.test_name != "zero_variance_indeterminate"
         ]
         secondary_p_vals = [comparisons[i].p_value for i in secondary_indices]
 
@@ -140,7 +146,22 @@ class HypothesisTestEngine:
                 f"under {comp.error_model}."
             )
 
-        # 2. Single-trial point comparison
+        # 2. Zero-variance deterministic tests
+        if comp.test_name == "zero_variance_indeterminate":
+            return (
+                f"At {rate_pct} error rate, {metric_label} changed by {diff_pct} in both Real and Null. "
+                f"Both groups produced identical values (zero variance); the response is purely "
+                f"mechanical and does not depend on biological connectome organization."
+            )
+        if comp.test_name == "zero_variance_deterministic":
+            direction = "greater" if comp.effect_difference > 0 else "less"
+            return (
+                f"At {rate_pct} error rate, {metric_label} changed by {comp.real_mean_effect:+.2%} in Real "
+                f"vs {comp.null_mean_effect:+.2%} in Null (difference = {diff_pct}). "
+                f"Both groups have zero variance, so the difference is deterministic."
+            )
+
+        # 3. Single-trial point comparison
         if comp.real_n == 1 and comp.null_n == 1:
             direction = "amplified" if comp.effect_difference > 0 else "buffered"
             return (
@@ -149,7 +170,7 @@ class HypothesisTestEngine:
                 f"Single trial evaluated (deterministic point difference; run >= 3 seeds for significance testing)."
             )
 
-        # 3. Replicated significance outcomes
+        # 4. Replicated significance outcomes
         if is_sig:
             direction = "greater" if comp.effect_difference > 0 else "less"
             return (

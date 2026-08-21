@@ -15,7 +15,7 @@
 
 ### Q2: Why are merge errors so much more destructive than split errors?
 > **15-Second Answer**:  
-> "Split errors merely dilute existing connections across daughter fragments, preserving 100% of edges and total synapses. Merge errors, on the other hand, fuse distinct functional entities, obliterating internal edges ($-10.9\%$), shrinking graph components ($-9.0\%$), and pooling synaptic weights into massive artificial super-hubs (+46.9% weight variance surge). They fundamentally destroy circuit modularity."
+> "Split errors merely dilute existing connections across daughter fragments, preserving 100% of edges and total synapses. Merge errors, on the other hand, fuse distinct functional entities, obliterating internal edges ($-10.9\%$), shrinking graph components ($-9.0\%$), and pooling synaptic weights into massive artificial super-hubs (+46.9% weight variance surge). They fundamentally disrupt the neuron-identity layer that defines circuit structure."
 
 ---
 

@@ -29,12 +29,33 @@ def cohens_d(
     mean1: float, std1: float, n1: int,
     mean2: float, std2: float, n2: int,
 ) -> float:
-    """Compute Cohen's d effect size between two independent groups."""
+    """Compute Cohen's d effect size between two independent groups.
+
+    When both groups have zero variance, returns 0.0 (indeterminate) for
+    identical means, or a very large value for deterministic differences
+    (using the non-zero standard-deviation group as denominator if available,
+    otherwise returning 0.0 to signal that standard Cohen's d is undefined).
+    """
     if n1 + n2 <= 2:
         return 0.0
     pooled_var = ((n1 - 1) * (std1 ** 2) + (n2 - 1) * (std2 ** 2)) / (n1 + n2 - 2)
-    if pooled_var <= 1e-15 or not math.isfinite(pooled_var):
-        return 0.0
+    _VARIANCE_EPS = 1e-15
+    if pooled_var <= _VARIANCE_EPS or not math.isfinite(pooled_var):
+        # Both groups have zero variance.
+        # If means are identical, effect is zero.
+        if abs(mean1 - mean2) < _VARIANCE_EPS:
+            return 0.0
+        # Deterministic difference: use the non-zero-variance group
+        # as denominator, or fall back to a large sentinel value.
+        if std1 > _VARIANCE_EPS:
+            d = (mean1 - mean2) / std1
+        elif std2 > _VARIANCE_EPS:
+            d = (mean1 - mean2) / std2
+        else:
+            # Both truly zero-variance with different means.
+            # Use a large finite sentinel to indicate perfect separation.
+            d = float("inf") if (mean1 - mean2) > 0 else float("-inf")
+        return float(d) if math.isfinite(d) else (100.0 if d > 0 else -100.0)
     d = (mean1 - mean2) / math.sqrt(pooled_var)
     return float(d) if math.isfinite(d) else 0.0
 
@@ -153,7 +174,30 @@ class MetricComparator:
         test_name = "descriptive"
         warn = None
 
-        if n_real == 1 and n_null == 1:
+        # Zero-variance guard: when both groups have zero or near-zero variance,
+        # the t-statistic is undefined (division by zero).  A finite-sample
+        # Welch test may return p=0 as a numerical artefact.  We flag this
+        # explicitly so downstream FDR can exclude it.
+        _VARIANCE_EPS = 1e-15
+        both_zero_var = (r_std < _VARIANCE_EPS and n_std < _VARIANCE_EPS)
+        if both_zero_var:
+            if abs(diff) < _VARIANCE_EPS:
+                test_name = "zero_variance_indeterminate"
+                p_val = None
+                warn = (
+                    "Both groups have zero variance and identical means. "
+                    "The metric change is deterministic; no statistical test is applicable."
+                )
+            else:
+                # Deterministic difference: real and null produce different
+                # constant values.  This is a true mechanical separation.
+                test_name = "zero_variance_deterministic"
+                p_val = 0.0
+                warn = (
+                    "Both groups have zero variance but different means. "
+                    "The difference is deterministic; p=0 is exact, not a numerical artefact."
+                )
+        elif n_real == 1 and n_null == 1:
             test_name = "n=1_point_comparison"
             p_val = None
             warn = "Single trial evaluated (deterministic effect difference; significance testing requires >= 3 replicates)."
