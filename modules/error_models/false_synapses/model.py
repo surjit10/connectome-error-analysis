@@ -54,6 +54,12 @@ logger = logging.getLogger(__name__)
 _candidate_table: Optional[pl.DataFrame] = None
 
 
+def clear_candidate_cache() -> None:
+    """Clear in-memory cached candidate table."""
+    global _candidate_table
+    _candidate_table = None
+
+
 def _load_candidate_table(cache_path: Optional[Path] = None) -> pl.DataFrame:
     """Load the ranked candidate table from Parquet (cached in memory)."""
     global _candidate_table
@@ -63,17 +69,18 @@ def _load_candidate_table(cache_path: Optional[Path] = None) -> pl.DataFrame:
     if cache_path is None:
         cache_path = Path(CACHE_DIR) / "candidates.parquet"
 
-    if not cache_path.exists():
+    target_path = Path(cache_path)
+    if not target_path.exists() or not target_path.is_file():
         raise FileNotFoundError(
-            f"Candidate table not found at '{cache_path}'. "
-            "Run CandidateGenerator.generate() before attempting "
-            "false-synapse perturbation."
+            f"Candidate table not found at '{target_path}'. "
+            "Pass candidate_cache_path in error_model_config or run "
+            "CandidateGenerator(prepared).generate() before attempting false-synapse perturbation."
         )
 
-    _candidate_table = pl.read_parquet(str(cache_path))
+    _candidate_table = pl.read_parquet(str(target_path))
     logger.info(
         "[FalseSynapses] Loaded %s candidates from '%s'.",
-        f"{len(_candidate_table):,}", cache_path,
+        f"{len(_candidate_table):,}", target_path,
     )
     return _candidate_table
 

@@ -452,13 +452,14 @@ class ExperimentRunner:
             result.error_result = error_result
 
             if error_result and error_result.status == ErrorModelStatus.FAILED:
+                err_details = "; ".join(error_result.errors) if error_result.errors else "Unknown error"
                 msg = (
-                    f"Error model '{config.error_model_name}' failed; "
-                    "running analyses on baseline graph."
+                    f"Error model '{config.error_model_name}' failed: {err_details}. "
+                    "Execution aborted to prevent generating invalid baseline-fallback results."
                 )
-                logger.warning("[ExperimentRunner] %s", msg)
-                result.warnings.append(msg)
-                error_result = None  # fall back to baseline
+                logger.error("[ExperimentRunner] %s", msg)
+                result.errors.append(msg)
+                raise RuntimeError(msg)
 
         # ── Step 6: Build temporary analysis graph ───────────────────────
         # If an error model produced a mask or added_edges, build a

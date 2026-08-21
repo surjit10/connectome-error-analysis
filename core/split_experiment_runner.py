@@ -216,16 +216,14 @@ class SplitExperimentRunner:
                 error_result
                 and error_result.status == ErrorModelStatus.FAILED
             ):
-                logger.warning(
-                    "[SplitExperimentRunner] Error model '%s' failed; "
-                    "running analyses on baseline graph.",
-                    config.error_model_name,
+                err_details = "; ".join(error_result.errors) if error_result.errors else "Unknown error"
+                msg = (
+                    f"Error model '{config.error_model_name}' failed: {err_details}. "
+                    "Execution aborted to prevent generating invalid baseline-fallback results."
                 )
-                result.warnings.append(
-                    f"Error model '{config.error_model_name}' failed; "
-                    "running analyses on baseline graph."
-                )
-                error_result = None
+                logger.error("[SplitExperimentRunner] %s", msg)
+                result.errors.append(msg)
+                raise RuntimeError(msg)
 
         # ── Step 6: Build temporary split graph (EM4-specific) ───────────
         temp_graph: Optional[igraph.Graph] = None

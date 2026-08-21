@@ -283,20 +283,56 @@ class HypothesisExperimentRunner:
             logger.info(f"[{condition.upper()}] Running error model '{em_name}'...")
             runner = self._select_runner(em_name, builder)
 
+            # Pre-generate or discover false_synapses candidates if needed
+            cand_path_str: Optional[str] = None
+            if em_name == "false_synapses":
+                from modules.preprocessing import CandidateGenerator, preprocess_graph
+                from modules.error_models.false_synapses.model import clear_candidate_cache
+                clear_candidate_cache()
+                cache_dir = Path("research_data/cache/false_synapses")
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                rep_tag = f"_rep{null_graph_replicate_id}" if null_graph_replicate_id is not None else ""
+                cand_file = cache_dir / f"candidates_{config.dataset_name.lower()}_{condition}{rep_tag}.parquet"
+                std_file = cache_dir / "candidates.parquet"
+
+                if cand_file.exists():
+                    cand_path_str = str(cand_file)
+                elif condition == "real" and std_file.exists():
+                    cand_path_str = str(std_file)
+                else:
+                    try:
+                        prep_for_cand = preprocess_graph(graph, index_node_attrs=["top_region"])
+                        reg_idx = prep_for_cand.lookup.node_attr_index.get("top_region", {})
+                        if reg_idx:
+                            logger.info(f"[{condition.upper()}] Generating candidate cache for false_synapses at {cand_file}...")
+                            CandidateGenerator(prep_for_cand).generate(cand_file)
+                            cand_path_str = str(cand_file)
+                        elif std_file.exists():
+                            cand_path_str = str(std_file)
+                    except Exception as exc:
+                        logger.warning(f"[{condition.upper()}] Auto candidate generation skipped: {exc}")
+                        if std_file.exists():
+                            cand_path_str = str(std_file)
+
             perturbed_trial_metrics: Dict[float, Dict[int, Dict[str, Dict[str, float]]]] = {}
             # completion_ratios: {rate: {seed: achieved/requested ratio}} for EM4/EM5
             completion_ratios: Dict[float, Dict[int, float]] = {}
 
+            user_em_cfg = config.error_model_configs.get(em_name, {})
             for rate in config.error_rates:
                 perturbed_trial_metrics[rate] = {}
                 completion_ratios[rate] = {}
                 for seed in error_seeds:
+                    em_cfg: Dict[str, Any] = {**user_em_cfg, "error_rate": rate}
+                    if cand_path_str and "candidate_cache_path" not in em_cfg:
+                        em_cfg["candidate_cache_path"] = cand_path_str
+
                     t_cfg = ExperimentConfig(
                         dataset_name=config.dataset_name,
                         dataset_root=config.dataset_root,
                         configs_root=config.configs_root,
                         error_model_name=em_name,
-                        error_model_config={"error_rate": rate},
+                        error_model_config=em_cfg,
                         analysis_names=config.analysis_names,
                         analysis_configs=config.analysis_configs,
                         preprocessing_config=config.preprocessing_config,
@@ -304,6 +340,11 @@ class HypothesisExperimentRunner:
                         output_root=f"{out_root}/{em_name}/rate_{rate}_seed_{seed}",
                     )
                     t_res = runner.run(t_cfg)
+                    if not t_res.succeeded:
+                        err_str = "; ".join(t_res.errors) if t_res.errors else "Trial execution failed"
+                        raise RuntimeError(
+                            f"[{condition.upper()}] Error model '{em_name}' trial failed (rate={rate}, seed={seed}): {err_str}"
+                        )
                     perturbed_trial_metrics[rate][seed] = self._extract_metrics_dict(t_res)
 
                     # Capture perturbation_completion_ratio from error result.

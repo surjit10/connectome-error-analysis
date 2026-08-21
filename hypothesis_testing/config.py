@@ -142,6 +142,7 @@ class HypothesisExperimentConfig:
         "pagerank",
     ])
     analysis_configs: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    error_model_configs: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     preprocessing_config: Dict[str, Any] = field(default_factory=dict)
     output_root: str = "results/hypothesis_testing"
     significance_level: float = 0.05
