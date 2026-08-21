@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BANC — Hypothesis Testing Null Ensemble</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #0d1117; color: #e6edf3; max-width: 900px; margin: 0 auto; padding: 2.5rem; }
+    h1 { color: #58a6ff; font-size: 2rem; margin-bottom: 0.5rem; }
+    p.lead { color: #8b949e; font-size: 1.1rem; margin-bottom: 2rem; }
+    ul { list-style-type: none; padding: 0; }
+    li { margin: 0.75rem 0; }
+    a { color: #58a6ff; text-decoration: none; font-size: 1.1rem; font-weight: 500; padding: 0.5rem 1rem; background: #161b22; border: 1px solid #30363d; border-radius: 6px; display: inline-block; transition: all 0.2s ease; }
+    a:hover { background: #1f6feb; color: #ffffff; border-color: #58a6ff; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.5rem; margin-top: 2rem; }
+    .badge { background: #238636; color: white; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.85rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>BANC — Hypothesis Testing Null Ensemble</h1>
+  <p class="lead">Degree-preserving randomized ensemble results across 5 synapse error models (10 rates × 5 seeds = 250 trials).</p>
+  
+  <h2>Error Models</h2>
+  <ul>
+    <li><a href="missed_synapses/reports/summary.html">Missed Synapses</a></li>
+    <li><a href="false_synapses/reports/summary.html">False Synapses</a></li>
+    <li><a href="synapse_count_measurement/reports/summary.html">Synapse Count Measurement</a></li>
+    <li><a href="split_errors/reports/summary.html">Split Errors</a></li>
+    <li><a href="merge_errors/reports/summary.html">Merge Errors</a></li>
+  </ul>
+
+  <div class="card">
+    <h3>Dataset Summary</h3>
+    <p><strong>Null Model:</strong> <code>degree_preserving</code> (directed in/out degree-sequence matched random graph)</p>
+    <p><strong>Total Trials:</strong> 250 (5 error models × 10 error rates × 5 seeds)</p>
+    <p><strong>Analyses Performed:</strong> Basic Structure, Degree Distribution, Connected Components, Reciprocity, PageRank</p>
+  </div>
+</body>
+</html>

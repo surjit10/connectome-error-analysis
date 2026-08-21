@@ -131,16 +131,22 @@ class ExistingRealResultsLoader:
             is_near_zero = bool(row.get("is_near_zero_baseline", abs(b_val) < self.near_zero_threshold))
             seed = int(row.get("trial_seed", row.get("seed", 1)))
             null_rep_id = row.get("null_graph_replicate_id")
-            if pd.isna(null_rep_id):
+            if pd.isna(null_rep_id) or str(null_rep_id).strip() == "" or str(null_rep_id).lower() == "nan":
                 null_rep_id = None
             else:
-                null_rep_id = int(null_rep_id)
+                try:
+                    null_rep_id = int(float(null_rep_id))
+                except (ValueError, TypeError):
+                    null_rep_id = None
 
             comp_ratio = row.get("perturbation_completion_ratio")
-            if pd.isna(comp_ratio):
+            if pd.isna(comp_ratio) or str(comp_ratio).strip() == "" or str(comp_ratio).lower() == "nan":
                 comp_ratio = None
             else:
-                comp_ratio = float(comp_ratio)
+                try:
+                    comp_ratio = float(comp_ratio)
+                except (ValueError, TypeError):
+                    comp_ratio = None
 
             records.append(SecondaryEffectRecord(
                 condition=cond,
