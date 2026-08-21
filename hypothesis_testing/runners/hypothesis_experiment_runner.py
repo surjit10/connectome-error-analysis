@@ -114,7 +114,8 @@ class HypothesisExperimentRunner:
 
         try:
             # 1. Load dataset & build real base graph
-            logger.info(f"[HypothesisExperimentRunner] Loading dataset '{config.dataset_name}'...")
+            logger.info(f"[Step 1/6] Loading dataset '{config.dataset_name}' from '{config.dataset_root}'...")
+            t_load = time.perf_counter()
             dataset = load_dataset(
                 dataset_name=config.dataset_name,
                 dataset_root=config.dataset_root,
@@ -123,14 +124,15 @@ class HypothesisExperimentRunner:
             standard_builder = GraphBuilder()
             real_base_graph = standard_builder.build(dataset)
             logger.info(
-                f"[HypothesisExperimentRunner] Built real graph: "
+                f"[Step 1/6] ✓ Loaded dataset & built real graph in {time.perf_counter() - t_load:.2f}s: "
                 f"V={real_base_graph.vcount():,}, E={real_base_graph.ecount():,}."
             )
 
             # 2. Execute Condition A (Real)
             real_secondary_records: List[SecondaryEffectRecord] = []
             if config.run_real:
-                logger.info("[HypothesisExperimentRunner] Executing Condition A: Real Connectome...")
+                logger.info("[Step 2/6] Executing Condition A: Real Connectome Perturbations...")
+                t_real = time.perf_counter()
                 real_secondary_records = self._run_condition(
                     condition="real",
                     graph=real_base_graph,
@@ -139,6 +141,12 @@ class HypothesisExperimentRunner:
                     null_graph_replicate_id=None,
                     error_seeds=config.random_seeds,
                 )
+                logger.info(
+                    f"[Step 2/6] ✓ Completed Condition A (Real) in {time.perf_counter() - t_real:.2f}s: "
+                    f"Generated {len(real_secondary_records)} secondary effect records."
+                )
+            else:
+                logger.info("[Step 2/6] Skipping Condition A (Real) per execution mode.")
 
             # 3. Execute Condition B (Null) — one independently rewired graph per null_graph_seed
             null_secondary_records: List[SecondaryEffectRecord] = []
@@ -147,51 +155,65 @@ class HypothesisExperimentRunner:
                 null_graph_seeds = config.effective_null_graph_seeds
                 null_error_seeds = config.effective_null_error_seeds
                 logger.info(
-                    f"[HypothesisExperimentRunner] Generating {len(null_graph_seeds)} "
-                    f"independent null graph(s) via '{config.null_model_name}'..."
+                    f"[Step 3/6] Executing Condition B: Generating & perturbing {len(null_graph_seeds)} "
+                    f"null graph(s) via '{config.null_model_name}'..."
                 )
-                for rep_idx, ng_seed in enumerate(null_graph_seeds):
+                t_null_total = time.perf_counter()
+                for rep_idx, ng_seed in enumerate(null_graph_seeds, start=1):
+                    t_gen = time.perf_counter()
                     null_graph = null_model.generate(
                         real_graph=real_base_graph,
                         config=config.null_model_config,
                         seed=ng_seed,
                     )
                     logger.info(
-                        f"[HypothesisExperimentRunner] Null graph replicate {rep_idx} "
-                        f"(seed={ng_seed}): V={null_graph.vcount():,}, E={null_graph.ecount():,}."
+                        f"[Step 3/6] Null Replicate {rep_idx}/{len(null_graph_seeds)} (seed={ng_seed}) generated in "
+                        f"{time.perf_counter() - t_gen:.2f}s: V={null_graph.vcount():,}, E={null_graph.ecount():,}."
                     )
                     rep_records = self._run_condition(
                         condition="null",
                         graph=null_graph,
                         dataset=dataset,
                         config=config,
-                        null_graph_replicate_id=rep_idx + 1,
+                        null_graph_replicate_id=rep_idx,
                         error_seeds=null_error_seeds,
                     )
                     null_secondary_records.extend(rep_records)
-
+                logger.info(
+                    f"[Step 3/6] ✓ Completed Condition B (Null) in {time.perf_counter() - t_null_total:.2f}s: "
+                    f"Generated {len(null_secondary_records)} null records across {len(null_graph_seeds)} replicate(s)."
+                )
+            else:
+                logger.info("[Step 3/6] Skipping Condition B (Null) per execution mode.")
 
             all_secondary_records = real_secondary_records + null_secondary_records
             runner_result.secondary_records = all_secondary_records
 
             # 5. Perform Statistical Comparison (if both conditions were run)
             if config.run_real and config.run_null:
-                logger.info("[HypothesisExperimentRunner] Performing statistical comparisons...")
+                logger.info("[Step 4/6] Performing statistical metric comparisons...")
+                t_comp = time.perf_counter()
                 comparisons = self._compare_conditions(
                     real_records=real_secondary_records,
                     null_records=null_secondary_records,
                     config=config,
                 )
                 runner_result.comparison_results = comparisons
+                logger.info(f"[Step 4/6] ✓ Computed {len(comparisons)} metric comparison distributions in {time.perf_counter() - t_comp:.2f}s.")
 
-                logger.info("[HypothesisExperimentRunner] Evaluating hypotheses and adjusting FDR...")
+                logger.info("[Step 5/6] Evaluating hypothesis tests and applying Benjamini-Hochberg FDR...")
+                t_test = time.perf_counter()
                 self._test_engine.alpha = config.significance_level
                 test_results = self._test_engine.evaluate_suite(comparisons)
                 runner_result.test_results = test_results
+                logger.info(f"[Step 5/6] ✓ Evaluated {len(test_results)} hypothesis tests (alpha={config.significance_level}) in {time.perf_counter() - t_test:.2f}s.")
             else:
+                logger.info("[Step 4/6 & 5/6] Skipping statistical comparisons (single-condition mode).")
                 test_results = []
 
             # 6. Export deliverables
+            logger.info(f"[Step 6/6] Exporting experiment deliverables to '{config.output_root}'...")
+            t_exp = time.perf_counter()
             exporter = HypothesisExporter(output_root=config.output_root)
             exported = exporter.export(
                 dataset=config.dataset_name,
@@ -205,6 +227,7 @@ class HypothesisExperimentRunner:
                 },
             )
             runner_result.exported_paths = exported
+            logger.info(f"[Step 6/6] ✓ Exported {len(exported)} deliverable files in {time.perf_counter() - t_exp:.2f}s.")
 
         except Exception as exc:
             logger.exception(f"[HypothesisExperimentRunner] Pipeline failure: {exc}")
@@ -213,7 +236,7 @@ class HypothesisExperimentRunner:
 
         runner_result.runtime_seconds = time.perf_counter() - t_start
         logger.info(
-            f"[HypothesisExperimentRunner] Completed in {runner_result.runtime_seconds:.2f}s "
+            f"[HypothesisExperimentRunner] Total execution finished in {runner_result.runtime_seconds:.2f}s "
             f"(Status: {runner_result.status})."
         )
         return runner_result
@@ -231,29 +254,16 @@ class HypothesisExperimentRunner:
         null_graph_replicate_id: Optional[int],
         error_seeds: List[int],
     ) -> List[SecondaryEffectRecord]:
-        """Execute all error models and rates on a single graph condition.
-
-        Args:
-            condition: "real" or "null".
-            graph: The baseline graph for this condition (real or null).
-            dataset: Loaded FlyWireDataset.
-            config: Full hypothesis experiment config.
-            null_graph_replicate_id: Integer index of the null graph realisation,
-                or None for the real condition.  Forwarded to SecondaryEffectRecord.
-            error_seeds: Random seeds for the error-model RNG in this condition.
-                For real: config.random_seeds.  For null: config.effective_null_error_seeds.
-        """
-        # Use dependency-injected graph builder
+        """Execute all error models and rates on a single graph condition."""
         builder = _DirectGraphBuilder(graph)
+        cond_tag = f"NULL-REP{null_graph_replicate_id}" if null_graph_replicate_id is not None else "REAL"
         out_root = str(Path(config.output_root) / config.dataset_name / condition)
         if null_graph_replicate_id is not None:
             out_root = f"{out_root}/rep_{null_graph_replicate_id}"
 
         # 1. Establish 0% baseline metrics for this condition.
-        # The baseline runs with no error model applied, so the graph is unmodified
-        # and the result is deterministic regardless of which seed value is passed.
-        # Run once and reuse for all error_seeds — avoids O(N_seeds) redundant analysis.
-        logger.info(f"[{condition.upper()}] Running baseline (0% error)...")
+        logger.info(f"[{cond_tag}] Computing 0% error baseline metrics...")
+        t_base = time.perf_counter()
         base_runner = ExperimentRunner(
             analysis_registry=self._analysis_reg,
             error_registry=self._error_reg,
@@ -271,16 +281,21 @@ class HypothesisExperimentRunner:
             output_root=None,  # No raw export for internal baseline
         )
         _baseline_result = self._extract_metrics_dict(base_runner.run(b_cfg))
-        # Fan the single result across all seeds so extract_effects can do seed-paired lookup
         baseline_trial_metrics: Dict[int, Dict[str, Dict[str, float]]] = {
             seed: _baseline_result for seed in error_seeds
         }
+        logger.info(f"[{cond_tag}] ✓ Baseline computed in {time.perf_counter() - t_base:.2f}s ({len(_baseline_result)} analysis modules).")
 
         all_condition_records: List[SecondaryEffectRecord] = []
 
         # 2. Iterate through each error model
-        for em_name in config.error_model_names:
-            logger.info(f"[{condition.upper()}] Running error model '{em_name}'...")
+        for em_idx, em_name in enumerate(config.error_model_names, start=1):
+            t_em_start = time.perf_counter()
+            total_trials = len(config.error_rates) * len(error_seeds)
+            logger.info(
+                f"[{cond_tag}] Error Model {em_idx}/{len(config.error_model_names)}: '{em_name}' "
+                f"({len(config.error_rates)} rates × {len(error_seeds)} seeds = {total_trials} trials)..."
+            )
             runner = self._select_runner(em_name, builder)
 
             # Pre-generate or discover false_synapses candidates if needed
@@ -304,25 +319,27 @@ class HypothesisExperimentRunner:
                         prep_for_cand = preprocess_graph(graph, index_node_attrs=["top_region"])
                         reg_idx = prep_for_cand.lookup.node_attr_index.get("top_region", {})
                         if reg_idx:
-                            logger.info(f"[{condition.upper()}] Generating candidate cache for false_synapses at {cand_file}...")
+                            logger.info(f"[{cond_tag}] Pre-generating candidates for false_synapses at {cand_file}...")
                             CandidateGenerator(prep_for_cand).generate(cand_file)
                             cand_path_str = str(cand_file)
                         elif std_file.exists():
                             cand_path_str = str(std_file)
                     except Exception as exc:
-                        logger.warning(f"[{condition.upper()}] Auto candidate generation skipped: {exc}")
+                        logger.warning(f"[{cond_tag}] Auto candidate generation skipped: {exc}")
                         if std_file.exists():
                             cand_path_str = str(std_file)
 
             perturbed_trial_metrics: Dict[float, Dict[int, Dict[str, Dict[str, float]]]] = {}
-            # completion_ratios: {rate: {seed: achieved/requested ratio}} for EM4/EM5
             completion_ratios: Dict[float, Dict[int, float]] = {}
 
             user_em_cfg = config.error_model_configs.get(em_name, {})
+            trial_counter = 0
             for rate in config.error_rates:
                 perturbed_trial_metrics[rate] = {}
                 completion_ratios[rate] = {}
                 for seed in error_seeds:
+                    trial_counter += 1
+                    t_trial_start = time.perf_counter()
                     em_cfg: Dict[str, Any] = {**user_em_cfg, "error_rate": rate}
                     if cand_path_str and "candidate_cache_path" not in em_cfg:
                         em_cfg["candidate_cache_path"] = cand_path_str
@@ -340,18 +357,21 @@ class HypothesisExperimentRunner:
                         output_root=f"{out_root}/{em_name}/rate_{rate}_seed_{seed}",
                     )
                     t_res = runner.run(t_cfg)
+                    trial_dur = time.perf_counter() - t_trial_start
+
                     if not t_res.succeeded:
                         err_str = "; ".join(t_res.errors) if t_res.errors else "Trial execution failed"
+                        logger.error(f"[{cond_tag}] ✗ [{em_name}] Trial {trial_counter}/{total_trials} FAILED (rate={rate}, seed={seed}): {err_str}")
                         raise RuntimeError(
-                            f"[{condition.upper()}] Error model '{em_name}' trial failed (rate={rate}, seed={seed}): {err_str}"
+                            f"[{cond_tag}] Error model '{em_name}' trial failed (rate={rate}, seed={seed}): {err_str}"
                         )
+
+                    logger.info(
+                        f"[{cond_tag}] [{em_name}] Trial {trial_counter}/{total_trials} "
+                        f"(rate={rate:.3f}, seed={seed}) done in {trial_dur:.2f}s."
+                    )
                     perturbed_trial_metrics[rate][seed] = self._extract_metrics_dict(t_res)
 
-                    # Capture perturbation_completion_ratio from error result.
-                    # EM5 (merge_errors) and EM4 (split_errors) populate
-                    # perturbation_metadata["achieved_error_rate"] reflecting actual
-                    # vs. requested perturbation, which may diverge on null graphs
-                    # due to candidate starvation.  EM1/EM2/EM3 do not set this field.
                     ratio = self._extract_completion_ratio(t_res, rate)
                     if ratio is not None:
                         completion_ratios[rate][seed] = ratio
@@ -367,6 +387,10 @@ class HypothesisExperimentRunner:
                 perturbation_completion_ratios=(
                     completion_ratios if any(completion_ratios.values()) else None
                 ),
+            )
+            logger.info(
+                f"[{cond_tag}] ✓ Completed '{em_name}' ({total_trials} trials) in {time.perf_counter() - t_em_start:.2f}s "
+                f"→ Extracted {len(em_records)} secondary effect records."
             )
             all_condition_records.extend(em_records)
 
